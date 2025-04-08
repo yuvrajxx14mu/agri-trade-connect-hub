@@ -1,4 +1,3 @@
-
 import { BarChart3, Sprout, IndianRupee, ShoppingCart, ArrowUpRight, Package, Gavel } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -10,7 +9,9 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 
+// Chart data for revenue trend
 const data = [
   { name: "Jan", value: 40 },
   { name: "Feb", value: 30 },
@@ -21,43 +22,75 @@ const data = [
   { name: "Jul", value: 80 }
 ];
 
-const recentProducts = [
+// Mock data - In a real app, this would come from an API
+const products = [
   { id: "P1", name: "Organic Wheat", quantity: "20 Quintals", status: "Listed", price: "₹2,200/Quintal" },
   { id: "P2", name: "Premium Rice", quantity: "15 Quintals", status: "In Auction", price: "₹3,500/Quintal" },
   { id: "P3", name: "Yellow Lentils", quantity: "10 Quintals", status: "Sold", price: "₹9,000/Quintal" },
+  { id: "P4", name: "Red Chillies", quantity: "5 Quintals", status: "Listed", price: "₹12,000/Quintal" },
+  { id: "P5", name: "Fresh Potatoes", quantity: "25 Quintals", status: "Sold", price: "₹1,800/Quintal" },
+  { id: "P6", name: "Basmati Rice", quantity: "12 Quintals", status: "Listed", price: "₹6,500/Quintal" },
+];
+
+// Recent products for the table
+const recentProducts = products.slice(0, 3);
+
+const auctions = [
+  { id: "A1", product: "Organic Wheat", status: "active", currentBid: "₹2,450/Quintal" },
+  { id: "A2", product: "Premium Rice", status: "active", currentBid: "₹3,650/Quintal" },
+  { id: "A3", product: "Yellow Lentils", status: "active", currentBid: "₹9,200/Quintal" },
+];
+
+const orders = [
+  { id: "ORD123456", status: "pending", totalAmount: "₹60,000" },
+  { id: "ORD123457", status: "pending", totalAmount: "₹45,000" },
 ];
 
 const FarmerDashboard = () => {
   const navigate = useNavigate();
   
+  // Calculate statistics
+  const totalProducts = products.length;
+  const activeAuctions = auctions.filter(auction => auction.status === "active").length;
+  const totalRevenue = orders
+    .filter(order => order.status === "completed")
+    .reduce((sum, order) => sum + parseInt(order.totalAmount.replace(/[^0-9]/g, '')), 0);
+  const pendingOrders = orders.filter(order => order.status === "pending").length;
+
+  // Calculate percentage changes (mock data - in real app would compare with previous period)
+  const productChange = { value: "12%", positive: true };
+  const auctionChange = { value: "2", positive: true };
+  const revenueChange = { value: "8.5%", positive: true };
+  const orderChange = { value: "1", positive: false };
+  
   return (
     <DashboardLayout userRole="farmer">
-      <DashboardHeader title="Farmer Dashboard" userName="Rajesh Kumar" />
+      <DashboardHeader title="Farmer Dashboard" userName="Rajesh Kumar" userRole="farmer" />
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard 
           title="Total Products" 
-          value="24" 
+          value={totalProducts.toString()} 
           icon={Sprout}
-          change={{ value: "12%", positive: true }}
+          change={productChange}
         />
         <StatCard 
           title="Active Auctions" 
-          value="3" 
+          value={activeAuctions.toString()} 
           icon={Gavel}
-          change={{ value: "2", positive: true }}
+          change={auctionChange}
         />
         <StatCard 
           title="Total Revenue" 
-          value="₹1,24,500" 
+          value={`₹${totalRevenue.toLocaleString()}`} 
           icon={IndianRupee}
-          change={{ value: "8.5%", positive: true }}
+          change={revenueChange}
         />
         <StatCard 
           title="Pending Orders" 
-          value="2" 
+          value={pendingOrders.toString()} 
           icon={ShoppingCart}
-          change={{ value: "1", positive: false }}
+          change={orderChange}
         />
       </div>
 

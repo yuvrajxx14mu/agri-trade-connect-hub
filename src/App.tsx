@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +19,7 @@ import FarmerPricing from "./pages/FarmerPricing";
 import FarmerNotifications from "./pages/FarmerNotifications";
 import FarmerReports from "./pages/FarmerReports";
 import FarmerProfile from "./pages/FarmerProfile";
+import FarmerMessages from "./pages/FarmerMessages";
 
 import TraderMarket from "./pages/TraderMarket";
 import TraderAuctions from "./pages/TraderAuctions";
@@ -30,6 +30,7 @@ import TraderAppointments from "./pages/TraderAppointments";
 import TraderNotifications from "./pages/TraderNotifications";
 import TraderReports from "./pages/TraderReports";
 import TraderProfile from "./pages/TraderProfile";
+import TraderMessages from "./pages/TraderMessages";
 
 import Settings from "./pages/Settings";
 import ProductDetail from "./pages/ProductDetail";
@@ -66,6 +67,7 @@ const App = () => (
           <Route path="/farmer-notifications" element={<FarmerNotifications />} />
           <Route path="/farmer-reports" element={<FarmerReports />} />
           <Route path="/farmer-profile" element={<FarmerProfile />} />
+          <Route path="/farmer-messages" element={<FarmerMessages />} />
           
           {/* Trader Routes */}
           <Route path="/trader-dashboard" element={<TraderDashboard />} />
@@ -81,6 +83,7 @@ const App = () => (
           <Route path="/trader-notifications" element={<TraderNotifications />} />
           <Route path="/trader-reports" element={<TraderReports />} />
           <Route path="/trader-profile" element={<TraderProfile />} />
+          <Route path="/trader-messages" element={<TraderMessages />} />
           
           {/* Common Routes */}
           <Route path="/settings" element={<Settings />} />

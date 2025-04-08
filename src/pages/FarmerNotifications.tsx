@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -177,7 +176,7 @@ const FarmerNotifications = () => {
   
   return (
     <DashboardLayout userRole="farmer">
-      <DashboardHeader title="Notifications" userName="Rajesh Kumar" />
+      <DashboardHeader title="Notifications" userName="Rajesh Kumar" userRole="farmer" />
       
       <Card>
         <CardHeader className="flex flex-col sm:flex-row justify-between sm:items-center">

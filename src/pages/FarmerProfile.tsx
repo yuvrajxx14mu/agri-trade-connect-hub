@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -18,7 +17,7 @@ const FarmerProfile = () => {
   
   return (
     <DashboardLayout userRole="farmer">
-      <DashboardHeader title="My Profile" userName="Rajesh Kumar" />
+      <DashboardHeader title="My Profile" userName="Rajesh Kumar" userRole="farmer" />
       
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <Card className="lg:col-span-1">

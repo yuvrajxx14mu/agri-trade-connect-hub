@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import AuthForm from "@/components/AuthForm";
@@ -24,7 +23,7 @@ const Index = () => {
       </header>
 
       <main className="flex-1">
-        <section className="py-12 md:py-20">
+        <section className="min-h-[calc(100vh-80px)] flex items-center">
           <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
             <div>
               <h1 className="text-4xl md:text-5xl font-bold mb-4">Connect, Trade, and Grow Together</h1>
@@ -32,8 +31,20 @@ const Index = () => {
                 A digital marketplace bringing farmers and traders together, eliminating the need for physical APMC visits.
               </p>
               <div className="flex flex-wrap gap-4">
-                <Button className="bg-agri-primary" size="lg">Get Started</Button>
-                <Button variant="outline" size="lg">Learn More</Button>
+                <Button 
+                  className="bg-agri-primary" 
+                  size="lg"
+                  onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  Get Started
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="lg"
+                  onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  Learn More
+                </Button>
               </div>
             </div>
             <div>

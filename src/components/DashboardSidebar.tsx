@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -31,7 +30,8 @@ import {
   PieChart, 
   Bell, 
   Wallet,
-  Users
+  Users,
+  Mail
 } from "lucide-react";
 
 interface SidebarProps {
@@ -56,6 +56,7 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
     { title: "Shipments", url: "/farmer-shipments", icon: Truck },
     { title: "Appointments", url: "/farmer-appointments", icon: Calendar },
     { title: "Pricing", url: "/farmer-pricing", icon: Wallet },
+    { title: "Messages", url: "/farmer-messages", icon: Mail },
     { title: "Notifications", url: "/farmer-notifications", icon: Bell },
     { title: "Reports", url: "/farmer-reports", icon: BarChart3 },
     { title: "Profile", url: "/farmer-profile", icon: UserCircle },
@@ -69,6 +70,7 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
     { title: "Orders", url: "/trader-orders", icon: ShoppingCart },
     { title: "Shipments", url: "/trader-shipments", icon: Truck },
     { title: "Appointments", url: "/trader-appointments", icon: Calendar },
+    { title: "Messages", url: "/trader-messages", icon: Mail },
     { title: "Notifications", url: "/trader-notifications", icon: Bell },
     { title: "Reports", url: "/trader-reports", icon: BarChart3 },
     { title: "Profile", url: "/trader-profile", icon: UserCircle },
@@ -81,13 +83,13 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
   return (
     <>
       <div className="md:hidden fixed top-4 left-4 z-50">
-        <SidebarTrigger asChild>
+        <SidebarTrigger>
           <Button variant="outline" size="icon">
             <Menu className="h-5 w-5" />
           </Button>
         </SidebarTrigger>
       </div>
-      <Sidebar className={roleClass}>
+      <Sidebar className={roleClass} variant="sidebar" collapsible="none">
         <SidebarHeader className="flex p-4 items-center justify-between border-b">
           <div className="flex items-center gap-2">
             <div className="bg-primary p-1 rounded">
