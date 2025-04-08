@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -65,6 +66,15 @@ interface ProfileType {
   address: string | null;
   city: string | null;
   state: string | null;
+}
+
+// Define a type for notifications since it's not in the generated types
+interface Notification {
+  user_id: string;
+  title: string;
+  message: string;
+  type: string;
+  related_id?: string;
 }
 
 const OrderDetail = () => {
@@ -166,16 +176,17 @@ const OrderDetail = () => {
       const counterpartyId = userRole === 'farmer' ? order.trader_id : order.farmer_id;
       
       try {
-        // Insert into notifications table
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: counterpartyId,
-            title: "Order Status Updated",
-            message: `Order #${order.id.slice(0, 8)} has been updated to ${newStatus}`,
-            type: "order",
-            related_id: order.id
-          });
+        // Use type assertion for the notifications table
+        const notification: Notification = {
+          user_id: counterpartyId,
+          title: "Order Status Updated",
+          message: `Order #${order.id.slice(0, 8)} has been updated to ${newStatus}`,
+          type: "order",
+          related_id: order.id
+        };
+        
+        // Use type assertion to bypass type checking for the table name
+        await (supabase.from('notifications' as any).insert(notification as any));
       } catch (notifError) {
         console.error("Error creating notification:", notifError);
         // Continue with order update even if notification fails
