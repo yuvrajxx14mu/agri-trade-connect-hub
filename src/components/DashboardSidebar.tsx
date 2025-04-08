@@ -15,7 +15,24 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Home, BarChart3, ShoppingCart, Gavel, Scroll, Package, UserCircle, LogOut, Settings, Menu } from "lucide-react";
+import { 
+  Home, 
+  BarChart3, 
+  ShoppingCart, 
+  Gavel, 
+  Scroll, 
+  Package, 
+  UserCircle, 
+  LogOut, 
+  Settings, 
+  Menu, 
+  Truck, 
+  Calendar, 
+  PieChart, 
+  Bell, 
+  Wallet,
+  Users
+} from "lucide-react";
 
 interface SidebarProps {
   userRole: "farmer" | "trader";
@@ -36,6 +53,10 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
     { title: "My Products", url: "/farmer-products", icon: Package },
     { title: "My Auctions", url: "/farmer-auctions", icon: Gavel },
     { title: "Orders", url: "/farmer-orders", icon: ShoppingCart },
+    { title: "Shipments", url: "/farmer-shipments", icon: Truck },
+    { title: "Appointments", url: "/farmer-appointments", icon: Calendar },
+    { title: "Pricing", url: "/farmer-pricing", icon: Wallet },
+    { title: "Notifications", url: "/farmer-notifications", icon: Bell },
     { title: "Reports", url: "/farmer-reports", icon: BarChart3 },
     { title: "Profile", url: "/farmer-profile", icon: UserCircle },
   ];
@@ -44,7 +65,11 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
     { title: "Dashboard", url: "/trader-dashboard", icon: Home },
     { title: "Market", url: "/trader-market", icon: Package },
     { title: "Auctions", url: "/trader-auctions", icon: Gavel },
+    { title: "My Bids", url: "/trader-bids", icon: PieChart },
     { title: "Orders", url: "/trader-orders", icon: ShoppingCart },
+    { title: "Shipments", url: "/trader-shipments", icon: Truck },
+    { title: "Appointments", url: "/trader-appointments", icon: Calendar },
+    { title: "Notifications", url: "/trader-notifications", icon: Bell },
     { title: "Reports", url: "/trader-reports", icon: BarChart3 },
     { title: "Profile", url: "/trader-profile", icon: UserCircle },
   ];
