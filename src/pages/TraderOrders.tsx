@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -9,93 +9,100 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, ShoppingCart } from "lucide-react";
 import OrderCard from "@/components/OrderCard";
-
-// Sample data for orders with corrected types
-const orders = [
-  {
-    id: "ORD123456",
-    date: new Date(2025, 3, 5),
-    customer: { name: "Rajesh Kumar (Farmer)", avatar: "", initials: "RK" },
-    products: [
-      { name: "Organic Wheat", quantity: "20", price: "₹2,200/Quintal" }
-    ],
-    totalAmount: "₹44,000",
-    status: "confirmed" as "confirmed" | "pending" | "shipped" | "delivered" | "cancelled",
-    paymentStatus: "paid"
-  },
-  {
-    id: "ORD123457",
-    date: new Date(2025, 3, 3),
-    customer: { name: "Anand Singh (Farmer)", avatar: "", initials: "AS" },
-    products: [
-      { name: "Premium Rice", quantity: "15", price: "₹3,500/Quintal" }
-    ],
-    totalAmount: "₹52,500",
-    status: "processing" as "confirmed" | "pending" | "shipped" | "delivered" | "cancelled",
-    paymentStatus: "pending"
-  },
-  {
-    id: "ORD123458",
-    date: new Date(2025, 3, 1),
-    customer: { name: "Suresh Verma (Farmer)", avatar: "", initials: "SV" },
-    products: [
-      { name: "Yellow Lentils", quantity: "10", price: "₹9,000/Quintal" }
-    ],
-    totalAmount: "₹90,000",
-    status: "shipped" as "confirmed" | "pending" | "shipped" | "delivered" | "cancelled",
-    paymentStatus: "paid"
-  },
-  {
-    id: "ORD123459",
-    date: new Date(2025, 2, 28),
-    customer: { name: "Meena Patel (Farmer)", avatar: "", initials: "MP" },
-    products: [
-      { name: "Red Chillies", quantity: "5", price: "₹12,000/Quintal" }
-    ],
-    totalAmount: "₹60,000",
-    status: "delivered" as "confirmed" | "pending" | "shipped" | "delivered" | "cancelled",
-    paymentStatus: "paid"
-  },
-  {
-    id: "ORD123460",
-    date: new Date(2025, 2, 25),
-    customer: { name: "Harpreet Singh (Farmer)", avatar: "", initials: "HS" },
-    products: [
-      { name: "Basmati Rice", quantity: "12", price: "₹6,500/Quintal" }
-    ],
-    totalAmount: "₹78,000",
-    status: "completed" as "confirmed" | "pending" | "shipped" | "delivered" | "cancelled",
-    paymentStatus: "paid"
-  }
-];
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const TraderOrders = () => {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("active");
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!profile?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            created_at,
+            status,
+            payment_status,
+            quantity,
+            price,
+            total_amount,
+            farmer_id,
+            profiles(name),
+            products(name)
+          `)
+          .eq('trader_id', profile.id)
+          .order('created_at', { ascending: false });
+          
+        if (error) throw error;
+        
+        setOrders(data || []);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchOrders();
+  }, [profile?.id]);
   
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.products.some(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      order.profiles?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.products?.name.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesTab = 
-      (activeTab === "active" && ["confirmed", "processing", "shipped"].includes(order.status)) ||
+      (activeTab === "active" && ["pending", "confirmed", "processing", "shipped"].includes(order.status)) ||
       (activeTab === "completed" && ["delivered", "completed", "cancelled"].includes(order.status));
     
     return matchesSearch && matchesTab;
   });
   
+  const formatOrderData = (order: any) => {
+    return {
+      id: order.id,
+      orderDate: new Date(order.created_at),
+      customer: { 
+        name: order.profiles?.name || "Farmer", 
+        avatar: "", 
+        initials: order.profiles?.name?.split(' ').map((n: string) => n[0]).join('') || "F"
+      },
+      products: [
+        { 
+          name: order.products?.name || "Product", 
+          quantity: `${order.quantity}`, 
+          price: `₹${order.price}/Quintal` 
+        }
+      ],
+      totalAmount: `₹${order.total_amount}`,
+      status: order.status,
+      paymentStatus: order.payment_status
+    };
+  };
+  
   return (
     <DashboardLayout userRole="trader">
-      <DashboardHeader title="My Orders" userName="Vikram Sharma" />
+      <DashboardHeader 
+        title="Orders" 
+        userName={profile?.name || "User"} 
+        userRole="trader"
+      />
       
       <Card>
         <CardHeader className="flex flex-col sm:flex-row justify-between sm:items-center">
           <div>
             <CardTitle>Order Management</CardTitle>
-            <CardDescription>Manage and track all your purchases</CardDescription>
+            <CardDescription>Manage and track all your product orders</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
@@ -118,18 +125,16 @@ const TraderOrders = () => {
               </div>
             </div>
             
-            {filteredOrders.length > 0 ? (
+            {loading ? (
+              <div className="text-center py-12">
+                <p>Loading orders...</p>
+              </div>
+            ) : filteredOrders.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredOrders.map((order) => (
                   <OrderCard
                     key={order.id}
-                    id={order.id}
-                    date={order.date}
-                    customer={order.customer}
-                    products={order.products}
-                    totalAmount={order.totalAmount}
-                    status={order.status}
-                    paymentStatus={order.paymentStatus}
+                    {...formatOrderData(order)}
                     onClick={() => navigate(`/trader-orders/${order.id}`)}
                   />
                 ))}
@@ -146,7 +151,7 @@ const TraderOrders = () => {
                     : "You don't have any completed orders yet."}
                 </p>
                 <Button onClick={() => navigate("/trader-market")}>
-                  Browse Market
+                  Browse Products
                 </Button>
               </div>
             )}

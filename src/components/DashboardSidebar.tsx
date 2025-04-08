@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -33,6 +34,7 @@ import {
   Users,
   Mail
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 interface SidebarProps {
   userRole: "farmer" | "trader";
@@ -42,11 +44,17 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeItem, setActiveItem] = useState("");
+  const { profile, signOut } = useAuth();
 
   useEffect(() => {
     const path = location.pathname;
     setActiveItem(path);
   }, [location]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   const farmerMenuItems = [
     { title: "Dashboard", url: "/farmer-dashboard", icon: Home },
@@ -137,7 +145,7 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton onClick={() => navigate("/")}>
+                  <SidebarMenuButton onClick={handleSignOut}>
                     <span className="flex items-center gap-2">
                       <LogOut className="h-5 w-5" />
                       <span>Log out</span>

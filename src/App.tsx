@@ -1,9 +1,14 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/context/AuthContext";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+
 import Index from "./pages/Index";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import FarmerDashboard from "./pages/FarmerDashboard";
 import TraderDashboard from "./pages/TraderDashboard";
@@ -43,58 +48,197 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          
-          {/* Farmer Routes */}
-          <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
-          <Route path="/farmer-products" element={<FarmerProducts />} />
-          <Route path="/farmer-products/add" element={<ProductForm />} />
-          <Route path="/farmer-products/:id" element={<ProductDetail />} />
-          <Route path="/farmer-products/:id/edit" element={<ProductForm />} />
-          <Route path="/farmer-auctions" element={<FarmerAuctions />} />
-          <Route path="/farmer-auctions/create" element={<AuctionForm />} />
-          <Route path="/farmer-auctions/:id" element={<AuctionPage />} />
-          <Route path="/farmer-auctions/:id/edit" element={<AuctionForm />} />
-          <Route path="/farmer-orders" element={<FarmerOrders />} />
-          <Route path="/farmer-orders/:id" element={<OrderDetail />} />
-          <Route path="/farmer-shipments" element={<FarmerShipments />} />
-          <Route path="/farmer-shipments/:id" element={<ShipmentDetail />} />
-          <Route path="/farmer-appointments" element={<FarmerAppointments />} />
-          <Route path="/farmer-pricing" element={<FarmerPricing />} />
-          <Route path="/farmer-notifications" element={<FarmerNotifications />} />
-          <Route path="/farmer-reports" element={<FarmerReports />} />
-          <Route path="/farmer-profile" element={<FarmerProfile />} />
-          <Route path="/farmer-messages" element={<FarmerMessages />} />
-          
-          {/* Trader Routes */}
-          <Route path="/trader-dashboard" element={<TraderDashboard />} />
-          <Route path="/trader-market" element={<TraderMarket />} />
-          <Route path="/trader-auctions" element={<TraderAuctions />} />
-          <Route path="/trader-auctions/:id" element={<AuctionPage />} />
-          <Route path="/trader-bids" element={<TraderBids />} />
-          <Route path="/trader-orders" element={<TraderOrders />} />
-          <Route path="/trader-orders/:id" element={<OrderDetail />} />
-          <Route path="/trader-shipments" element={<TraderShipments />} />
-          <Route path="/trader-shipments/:id" element={<ShipmentDetail />} />
-          <Route path="/trader-appointments" element={<TraderAppointments />} />
-          <Route path="/trader-notifications" element={<TraderNotifications />} />
-          <Route path="/trader-reports" element={<TraderReports />} />
-          <Route path="/trader-profile" element={<TraderProfile />} />
-          <Route path="/trader-messages" element={<TraderMessages />} />
-          
-          {/* Common Routes */}
-          <Route path="/settings" element={<Settings />} />
-          
-          {/* Catch-all */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-      <Toaster />
-      <Sonner />
-    </TooltipProvider>
+    <AuthProvider>
+      <TooltipProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            
+            {/* Farmer Routes */}
+            <Route path="/farmer-dashboard" element={
+              <ProtectedRoute requiredRole="farmer">
+                <FarmerDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-products" element={
+              <ProtectedRoute requiredRole="farmer">
+                <FarmerProducts />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-products/add" element={
+              <ProtectedRoute requiredRole="farmer">
+                <ProductForm />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-products/:id" element={
+              <ProtectedRoute requiredRole="farmer">
+                <ProductDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-products/:id/edit" element={
+              <ProtectedRoute requiredRole="farmer">
+                <ProductForm />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-auctions" element={
+              <ProtectedRoute requiredRole="farmer">
+                <FarmerAuctions />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-auctions/create" element={
+              <ProtectedRoute requiredRole="farmer">
+                <AuctionForm />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-auctions/:id" element={
+              <ProtectedRoute requiredRole="farmer">
+                <AuctionPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-auctions/:id/edit" element={
+              <ProtectedRoute requiredRole="farmer">
+                <AuctionForm />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-orders" element={
+              <ProtectedRoute requiredRole="farmer">
+                <FarmerOrders />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-orders/:id" element={
+              <ProtectedRoute requiredRole="farmer">
+                <OrderDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-shipments" element={
+              <ProtectedRoute requiredRole="farmer">
+                <FarmerShipments />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-shipments/:id" element={
+              <ProtectedRoute requiredRole="farmer">
+                <ShipmentDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-appointments" element={
+              <ProtectedRoute requiredRole="farmer">
+                <FarmerAppointments />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-pricing" element={
+              <ProtectedRoute requiredRole="farmer">
+                <FarmerPricing />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-notifications" element={
+              <ProtectedRoute requiredRole="farmer">
+                <FarmerNotifications />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-reports" element={
+              <ProtectedRoute requiredRole="farmer">
+                <FarmerReports />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-profile" element={
+              <ProtectedRoute requiredRole="farmer">
+                <FarmerProfile />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-messages" element={
+              <ProtectedRoute requiredRole="farmer">
+                <FarmerMessages />
+              </ProtectedRoute>
+            } />
+            
+            {/* Trader Routes */}
+            <Route path="/trader-dashboard" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-market" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderMarket />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-auctions" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderAuctions />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-auctions/:id" element={
+              <ProtectedRoute requiredRole="trader">
+                <AuctionPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-bids" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderBids />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-orders" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderOrders />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-orders/:id" element={
+              <ProtectedRoute requiredRole="trader">
+                <OrderDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-shipments" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderShipments />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-shipments/:id" element={
+              <ProtectedRoute requiredRole="trader">
+                <ShipmentDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-appointments" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderAppointments />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-notifications" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderNotifications />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-reports" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderReports />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-profile" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderProfile />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-messages" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderMessages />
+              </ProtectedRoute>
+            } />
+            
+            {/* Common Routes */}
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            } />
+            
+            {/* Catch-all */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+        <Toaster />
+        <Sonner />
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

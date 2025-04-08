@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -9,33 +10,95 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Package, Plus, Search, Pencil, Trash, Gavel, Eye } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/utils";
 
-const products = [
-  { id: "P1", name: "Organic Wheat", category: "Cereals", quantity: "20 Quintals", status: "Listed", price: "₹2,200/Quintal", location: "Amritsar" },
-  { id: "P2", name: "Premium Rice", category: "Cereals", quantity: "15 Quintals", status: "In Auction", price: "₹3,500/Quintal", location: "Karnal" },
-  { id: "P3", name: "Yellow Lentils", category: "Pulses", quantity: "10 Quintals", status: "Sold", price: "₹9,000/Quintal", location: "Indore" },
-  { id: "P4", name: "Red Chillies", category: "Spices", quantity: "5 Quintals", status: "Listed", price: "₹12,000/Quintal", location: "Guntur" },
-  { id: "P5", name: "Fresh Potatoes", category: "Vegetables", quantity: "25 Quintals", status: "Sold", price: "₹1,800/Quintal", location: "Agra" },
-  { id: "P6", name: "Basmati Rice", category: "Cereals", quantity: "12 Quintals", status: "Listed", price: "₹6,500/Quintal", location: "Dehradun" },
-];
+interface Product {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  status: string;
+  price: number;
+  location: string;
+}
 
 const FarmerProducts = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  const handleDeleteProduct = (productId: string) => {
-    // TODO: Implement delete functionality with confirmation
-    if (window.confirm("Are you sure you want to delete this product?")) {
-      // Here you would typically make an API call to delete the product
-      console.log("Deleting product:", productId);
+  useEffect(() => {
+    const fetchProducts = async () => {
+      if (!profile?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('farmer_id', profile.id);
+          
+        if (error) throw error;
+        
+        setProducts(data as Product[]);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load products",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchProducts();
+  }, [profile?.id, toast]);
+  
+  const handleDeleteProduct = async (productId: string) => {
+    // Confirm deletion
+    if (!window.confirm("Are you sure you want to delete this product?")) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setProducts(products.filter(product => product.id !== productId));
+      
+      toast({
+        title: "Product Deleted",
+        description: "The product has been deleted successfully"
+      });
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the product",
+        variant: "destructive"
+      });
     }
   };
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        product.location.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = 
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.location.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || product.status.toLowerCase() === statusFilter.toLowerCase();
     
@@ -44,7 +107,11 @@ const FarmerProducts = () => {
   
   return (
     <DashboardLayout userRole="farmer">
-      <DashboardHeader title="My Products" userName="Rajesh Kumar" />
+      <DashboardHeader 
+        title="My Products" 
+        userName={profile?.name || "User"} 
+        userRole="farmer"
+      />
       
       <Card>
         <CardHeader className="flex flex-col sm:flex-row justify-between sm:items-center">
@@ -79,8 +146,8 @@ const FarmerProducts = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="listed">Listed</SelectItem>
-                  <SelectItem value="in auction">In Auction</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="auction">In Auction</SelectItem>
                   <SelectItem value="sold">Sold</SelectItem>
                 </SelectContent>
               </Select>
@@ -101,28 +168,38 @@ const FarmerProducts = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.length > 0 ? (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center h-24">
+                      <div className="flex flex-col items-center justify-center">
+                        <p>Loading products...</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredProducts.length > 0 ? (
                   filteredProducts.map((product) => (
                     <TableRow key={product.id}>
                       <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell>{product.category}</TableCell>
-                      <TableCell>{product.quantity}</TableCell>
+                      <TableCell>{product.quantity} {product.unit}</TableCell>
                       <TableCell>{product.location}</TableCell>
                       <TableCell>
                         <Badge 
                           variant="outline" 
                           className={
-                            product.status === "Sold" 
+                            product.status === "sold" 
                               ? "bg-green-50 text-green-700 border-green-200" 
-                              : product.status === "In Auction" 
+                              : product.status === "auction" 
                               ? "bg-blue-50 text-blue-700 border-blue-200"
                               : "bg-yellow-50 text-yellow-700 border-yellow-200"
                           }
                         >
-                          {product.status}
+                          {product.status === "active" ? "Listed" : 
+                           product.status === "auction" ? "In Auction" : 
+                           product.status.charAt(0).toUpperCase() + product.status.slice(1)}
                         </Badge>
                       </TableCell>
-                      <TableCell>{product.price}</TableCell>
+                      <TableCell>{formatCurrency(product.price)}/{product.unit}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="ghost" size="icon" onClick={() => navigate(`/farmer-products/${product.id}`)}>
@@ -131,11 +208,11 @@ const FarmerProducts = () => {
                           <Button variant="ghost" size="icon" onClick={() => navigate(`/farmer-products/${product.id}/edit`)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          {product.status === "Listed" && (
+                          {product.status === "active" && (
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              onClick={() => navigate(`/farmer-products/${product.id}/auction`)}
+                              onClick={() => navigate(`/farmer-auctions/create?product=${product.id}`)}
                               className="hover:bg-blue-50"
                             >
                               <Gavel className="h-4 w-4" />

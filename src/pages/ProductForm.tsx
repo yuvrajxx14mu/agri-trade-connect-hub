@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -8,32 +9,89 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+
+interface FormData {
+  name: string;
+  description: string;
+  category: string;
+  quantity: string;
+  unit: string;
+  price: string;
+  location: string;
+  quality: string;
+}
 
 const ProductForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { profile } = useAuth();
   const isEditMode = !!id;
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   
-  // Initial form data - in edit mode, we would fetch the product data
-  const [formData, setFormData] = useState({
-    name: isEditMode ? "Organic Wheat" : "",
-    description: isEditMode ? "High-quality organic wheat grown without pesticides." : "",
-    category: isEditMode ? "Cereals" : "",
-    quantity: isEditMode ? "20" : "",
-    unit: isEditMode ? "Quintals" : "Quintals",
-    price: isEditMode ? "2200" : "",
-    location: isEditMode ? "Amritsar, Punjab" : "",
-    harvestDate: isEditMode ? "2025-03-15" : "",
-    shelfLife: isEditMode ? "12" : "",
-    specifications: isEditMode ? [
-      { label: "Type", value: "Organic" },
-      { label: "Variety", value: "HD-2967" },
-      { label: "Moisture", value: "12%" },
-    ] : []
+  const [formData, setFormData] = useState<FormData>({
+    name: "",
+    description: "",
+    category: "",
+    quantity: "",
+    unit: "Quintals",
+    price: "",
+    location: "",
+    quality: "Standard"
   });
+  
+  useEffect(() => {
+    const fetchProduct = async () => {
+      if (!isEditMode || !profile?.id) return;
+      
+      setLoading(true);
+      
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', id)
+          .eq('farmer_id', profile.id)
+          .single();
+          
+        if (error) throw error;
+        
+        if (!data) {
+          navigate('/farmer-products');
+          return;
+        }
+        
+        setFormData({
+          name: data.name,
+          description: data.description || "",
+          category: data.category,
+          quantity: data.quantity.toString(),
+          unit: data.unit,
+          price: data.price.toString(),
+          location: data.location,
+          quality: data.quality
+        });
+        
+      } catch (error) {
+        console.error('Error fetching product:', error);
+        toast({
+          title: "Error",
+          description: "Could not load product data",
+          variant: "destructive"
+        });
+        navigate('/farmer-products');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchProduct();
+  }, [id, isEditMode, profile?.id, navigate, toast]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -44,17 +102,85 @@ const ProductForm = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // In a real app, we would call API here
-    toast({
-      title: isEditMode ? "Product Updated" : "Product Created",
-      description: `${formData.name} has been ${isEditMode ? "updated" : "added"} successfully.`,
-    });
+    if (!profile?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to perform this action",
+        variant: "destructive"
+      });
+      return;
+    }
     
-    navigate("/farmer-products");
+    setSubmitting(true);
+    
+    try {
+      const productData = {
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        quantity: parseFloat(formData.quantity),
+        unit: formData.unit,
+        price: parseFloat(formData.price),
+        location: formData.location,
+        quality: formData.quality,
+        status: "active",
+        farmer_id: profile.id,
+        farmer_name: profile.name
+      };
+      
+      if (isEditMode) {
+        // Update existing product
+        const { error } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', id)
+          .eq('farmer_id', profile.id);
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Product Updated",
+          description: `${formData.name} has been updated successfully.`,
+        });
+      } else {
+        // Create new product
+        const { error } = await supabase
+          .from('products')
+          .insert([productData]);
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Product Created",
+          description: `${formData.name} has been added to your inventory.`,
+        });
+      }
+      
+      navigate("/farmer-products");
+    } catch (error) {
+      console.error('Error saving product:', error);
+      toast({
+        title: "Error",
+        description: `Failed to ${isEditMode ? "update" : "create"} product`,
+        variant: "destructive"
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
+  
+  if (loading) {
+    return (
+      <DashboardLayout userRole="farmer">
+        <div className="flex justify-center items-center h-[80vh]">
+          <p>Loading product data...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
   
   return (
     <DashboardLayout userRole="farmer">
@@ -70,7 +196,7 @@ const ProductForm = () => {
         
         <DashboardHeader 
           title={isEditMode ? "Edit Product" : "Add New Product"} 
-          userName="Rajesh Kumar"
+          userName={profile?.name || "User"}
           userRole="farmer"
         />
       </div>
@@ -196,28 +322,21 @@ const ProductForm = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="harvestDate">Harvest Date *</Label>
-                <Input 
-                  id="harvestDate" 
-                  name="harvestDate" 
-                  type="date"
-                  value={formData.harvestDate} 
-                  onChange={handleInputChange}
+                <Label htmlFor="quality">Quality *</Label>
+                <Select 
+                  value={formData.quality} 
+                  onValueChange={(value) => handleSelectChange("quality", value)}
                   required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="shelfLife">Shelf Life (months) *</Label>
-                <Input 
-                  id="shelfLife" 
-                  name="shelfLife" 
-                  type="number"
-                  value={formData.shelfLife} 
-                  onChange={handleInputChange}
-                  placeholder="Enter shelf life" 
-                  required
-                />
+                >
+                  <SelectTrigger id="quality">
+                    <SelectValue placeholder="Select quality" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Premium">Premium</SelectItem>
+                    <SelectItem value="Standard">Standard</SelectItem>
+                    <SelectItem value="Economy">Economy</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>
@@ -227,12 +346,22 @@ const ProductForm = () => {
               variant="outline" 
               type="button"
               onClick={() => navigate("/farmer-products")}
+              disabled={submitting}
             >
               Cancel
             </Button>
-            <Button type="submit">
-              <Save className="mr-2 h-4 w-4" />
-              {isEditMode ? "Update Product" : "Save Product"}
+            <Button type="submit" disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEditMode ? "Updating..." : "Saving..."}
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  {isEditMode ? "Update Product" : "Save Product"}
+                </>
+              )}
             </Button>
           </CardFooter>
         </form>

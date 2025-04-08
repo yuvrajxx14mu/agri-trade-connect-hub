@@ -1,109 +1,110 @@
 
-import React from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowRight, Package, Calendar, Truck, Clock } from "lucide-react";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent } from "@/components/ui/card";
+import { formatDate } from "@/lib/utils";
 
-interface OrderCardProps {
+export interface OrderCardProps {
   id: string;
+  orderDate: Date;
+  customer: {
+    name: string;
+    avatar: string;
+    initials: string;
+  };
   products: {
     name: string;
     quantity: string;
+    price: string;
   }[];
   totalAmount: string;
-  orderDate: string;
-  deliveryDate: string | null;
-  status: "pending" | "confirmed" | "shipped" | "delivered" | "cancelled";
-  userRole: "farmer" | "trader";
+  status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "completed";
+  paymentStatus: string;
+  onClick?: () => void;
 }
 
 const OrderCard = ({
   id,
+  orderDate,
+  customer,
   products,
   totalAmount,
-  orderDate,
-  deliveryDate,
   status,
-  userRole,
+  paymentStatus,
+  onClick,
 }: OrderCardProps) => {
-  const navigate = useNavigate();
-  
-  const statusColors = {
-    pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
-    confirmed: "bg-blue-50 text-blue-700 border-blue-200",
-    shipped: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    delivered: "bg-green-50 text-green-700 border-green-200",
-    cancelled: "bg-red-50 text-red-700 border-red-200",
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-50 text-yellow-700 border-yellow-200";
+      case "confirmed":
+      case "processing":
+        return "bg-blue-50 text-blue-700 border-blue-200";
+      case "shipped":
+        return "bg-purple-50 text-purple-700 border-purple-200";
+      case "delivered":
+      case "completed":
+        return "bg-green-50 text-green-700 border-green-200";
+      case "cancelled":
+        return "bg-red-50 text-red-700 border-red-200";
+      default:
+        return "bg-gray-50 text-gray-700 border-gray-200";
+    }
   };
-  
-  const basePath = userRole === "farmer" ? "/farmer-orders" : "/trader-orders";
-  
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case "paid":
+        return "bg-green-50 text-green-700 border-green-200";
+      case "pending":
+        return "bg-yellow-50 text-yellow-700 border-yellow-200";
+      case "failed":
+        return "bg-red-50 text-red-700 border-red-200";
+      default:
+        return "bg-gray-50 text-gray-700 border-gray-200";
+    }
+  };
+
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-4">
-        <div className="flex justify-between mb-2">
-          <h3 className="font-medium">Order #{id}</h3>
-          <Badge 
-            variant="outline" 
-            className={statusColors[status]}
-          >
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-          </Badge>
-        </div>
-        
-        <div className="space-y-2 my-3">
-          {products.map((product, index) => (
-            <div key={index} className="flex justify-between items-center">
-              <div className="flex items-center">
-                <Package className="h-4 w-4 mr-2 text-muted-foreground" />
-                <span className="text-sm">{product.name}</span>
-              </div>
-              <span className="text-sm font-medium">{product.quantity}</span>
+    <Card className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
+      <CardContent className="p-0">
+        <div className="p-4 border-b">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="font-medium">{id}</h3>
+              <p className="text-sm text-muted-foreground">
+                {formatDate(orderDate)}
+              </p>
             </div>
-          ))}
-        </div>
-        
-        <Separator className="my-3" />
-        
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <div className="flex items-center text-muted-foreground mb-1">
-              <Calendar className="h-3.5 w-3.5 mr-1" />
-              Order Date
+            <div className="flex flex-col gap-2 items-end">
+              <Badge variant="outline" className={getStatusColor(status)}>
+                {status.charAt(0).toUpperCase() + status.slice(1)}
+              </Badge>
+              <Badge variant="outline" className={getPaymentStatusColor(paymentStatus)}>
+                {paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}
+              </Badge>
             </div>
-            <div>{orderDate}</div>
-          </div>
-          <div>
-            <div className="flex items-center text-muted-foreground mb-1">
-              {deliveryDate ? (
-                <Truck className="h-3.5 w-3.5 mr-1" />
-              ) : (
-                <Clock className="h-3.5 w-3.5 mr-1" />
-              )}
-              {deliveryDate ? "Delivery Date" : "Pending Delivery"}
-            </div>
-            <div>{deliveryDate || "Not scheduled"}</div>
           </div>
         </div>
-        
-        <div className="mt-4 flex justify-between items-center">
-          <div className="text-sm text-muted-foreground">Total Amount</div>
-          <div className="font-bold">{totalAmount}</div>
+        <div className="p-4 flex items-center space-x-4">
+          <Avatar>
+            <AvatarImage src={customer.avatar} alt={customer.name} />
+            <AvatarFallback>{customer.initials}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <h4 className="font-medium">{customer.name}</h4>
+            <p className="text-sm text-muted-foreground">
+              {products.length === 1
+                ? products[0].name
+                : `${products[0].name} and ${products.length - 1} more`}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-semibold">{totalAmount}</p>
+            <p className="text-sm text-muted-foreground">Total</p>
+          </div>
         </div>
       </CardContent>
-      <CardFooter className="p-4 pt-0">
-        <Button 
-          variant="ghost" 
-          className="w-full justify-between"
-          onClick={() => navigate(`${basePath}/${id}`)}
-        >
-          View Details
-          <ArrowRight className="h-4 w-4" />
-        </Button>
-      </CardFooter>
     </Card>
   );
 };

@@ -1,15 +1,16 @@
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Bell, Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-interface DashboardHeaderProps {
+export interface DashboardHeaderProps {
   title: string;
   userName: string;
-  userRole: "farmer" | "trader";
+  userRole?: "farmer" | "trader";
 }
 
-const DashboardHeader = ({ title, userName, userRole }: DashboardHeaderProps) => {
+const DashboardHeader = ({ title, userName, userRole = "farmer" }: DashboardHeaderProps) => {
   const navigate = useNavigate();
 
   const handleNotificationClick = () => {
