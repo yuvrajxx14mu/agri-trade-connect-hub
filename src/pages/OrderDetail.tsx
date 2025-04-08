@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -110,7 +109,8 @@ const OrderDetail = () => {
         }
         
         setOrder(orderData as OrderType);
-        setNewStatus(orderData.status);
+        // Use type assertion to ensure proper typing
+        setNewStatus(orderData.status as OrderStatus);
         
         // Fetch product
         const { data: productData, error: productError } = await supabase
@@ -162,16 +162,24 @@ const OrderDetail = () => {
       if (error) throw error;
       
       // Create notification for counterparty
+      // Since notifications table was just created, we need to handle it properly
       const counterpartyId = userRole === 'farmer' ? order.trader_id : order.farmer_id;
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: counterpartyId,
-          title: "Order Status Updated",
-          message: `Order #${order.id.slice(0, 8)} has been updated to ${newStatus}`,
-          type: "order",
-          related_id: order.id
-        });
+      
+      try {
+        // Insert into notifications table
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: counterpartyId,
+            title: "Order Status Updated",
+            message: `Order #${order.id.slice(0, 8)} has been updated to ${newStatus}`,
+            type: "order",
+            related_id: order.id
+          });
+      } catch (notifError) {
+        console.error("Error creating notification:", notifError);
+        // Continue with order update even if notification fails
+      }
       
       // Update local state
       setOrder({
@@ -477,7 +485,10 @@ const OrderDetail = () => {
                   <h3 className="font-medium mb-4">Update Order Status</h3>
                   <div className="flex gap-4">
                     <div className="flex-1">
-                      <Select value={newStatus} onValueChange={(value) => setNewStatus(value as OrderStatus)}>
+                      <Select 
+                        value={newStatus} 
+                        onValueChange={(value) => setNewStatus(value as OrderStatus)}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select new status" />
                         </SelectTrigger>

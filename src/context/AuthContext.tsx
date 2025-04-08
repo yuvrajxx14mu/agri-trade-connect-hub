@@ -53,7 +53,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
               .eq('id', session.user.id)
               .single();
               
-            setProfile(data);
+            if (data) {
+              // Cast the role to ensure it's a valid type
+              const typedProfile: Profile = {
+                id: data.id,
+                name: data.name,
+                role: data.role as "farmer" | "trader",
+                phone: data.phone
+              };
+              setProfile(typedProfile);
+            }
             setIsLoading(false);
           }, 0);
         } else {
@@ -76,7 +85,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           .eq('id', session.user.id)
           .single();
           
-        setProfile(data);
+        if (data) {
+          // Cast the role to ensure it's a valid type
+          const typedProfile: Profile = {
+            id: data.id,
+            name: data.name,
+            role: data.role as "farmer" | "trader",
+            phone: data.phone
+          };
+          setProfile(typedProfile);
+        }
       }
       
       setIsLoading(false);
