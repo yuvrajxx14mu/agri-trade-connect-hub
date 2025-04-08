@@ -42,7 +42,7 @@ const ProductCard = ({
   
   return (
     <Card className="overflow-hidden h-full flex flex-col">
-      <div className="relative h-48 bg-muted">
+      <div className="relative h-36 sm:h-48 bg-muted">
         {image ? (
           <img
             src={image}
@@ -51,47 +51,47 @@ const ProductCard = ({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-muted">
-            <Package className="h-16 w-16 text-muted-foreground opacity-20" />
+            <Package className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground opacity-20" />
           </div>
         )}
         <Badge 
           variant="outline" 
-          className={`absolute top-2 right-2 ${statusColors[status as keyof typeof statusColors] || "bg-muted"}`}
+          className={`absolute top-2 right-2 text-xxs sm:text-xs ${statusColors[status as keyof typeof statusColors] || "bg-muted"}`}
         >
           {status}
         </Badge>
       </div>
-      <CardContent className="p-4 flex-grow">
+      <CardContent className="p-3 sm:p-4 flex-grow">
         <div className="mb-2">
-          <h3 className="font-bold text-lg line-clamp-1">{name}</h3>
-          <div className="flex items-center text-sm text-muted-foreground mb-1">
-            <Tag className="h-3.5 w-3.5 mr-1" />
+          <h3 className="font-bold text-base sm:text-lg line-clamp-1">{name}</h3>
+          <div className="flex items-center text-xs sm:text-sm text-muted-foreground mb-1">
+            <Tag className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
             {category}
           </div>
-          <div className="flex items-center text-sm text-muted-foreground">
-            <MapPin className="h-3.5 w-3.5 mr-1" />
+          <div className="flex items-center text-xs sm:text-sm text-muted-foreground">
+            <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
             {location}
           </div>
         </div>
         <div className="flex justify-between items-end mt-2">
           <div>
-            <div className="text-xs text-muted-foreground">Quantity</div>
-            <div className="font-medium">{quantity}</div>
+            <div className="text-xxs sm:text-xs text-muted-foreground">Quantity</div>
+            <div className="font-medium text-xs sm:text-sm">{quantity}</div>
           </div>
           <div className="text-right">
-            <div className="text-xs text-muted-foreground">Price</div>
-            <div className="font-bold text-primary">{price}</div>
+            <div className="text-xxs sm:text-xs text-muted-foreground">Price</div>
+            <div className="font-bold text-xs sm:text-sm text-primary">{price}</div>
           </div>
         </div>
       </CardContent>
-      <CardFooter className="p-4 pt-0 flex gap-2">
+      <CardFooter className="p-3 sm:p-4 pt-0 flex gap-1 sm:gap-2">
         <Button 
           variant="outline" 
           size="sm" 
-          className="flex-1"
+          className="flex-1 text-xs sm:text-sm h-8 sm:h-9"
           onClick={() => navigate(`${basePath}/${id}`)}
         >
-          <Eye className="h-4 w-4 mr-1" />
+          <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
           Details
         </Button>
         
@@ -99,27 +99,27 @@ const ProductCard = ({
           <Button 
             variant="default" 
             size="sm" 
-            className="flex-1 bg-agri-farmer"
+            className="flex-1 bg-agri-farmer text-xs sm:text-sm h-8 sm:h-9"
             onClick={() => navigate(`${basePath}/${id}/auction`)}
           >
-            <Gavel className="h-4 w-4 mr-1" />
+            <Gavel className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
             Auction
           </Button>
         ) : userRole === "trader" && (
           <Button 
             variant="default" 
             size="sm" 
-            className="flex-1 bg-agri-trader"
+            className="flex-1 bg-agri-trader text-xs sm:text-sm h-8 sm:h-9"
             onClick={() => navigate(status === "In Auction" ? `${auctionPath}/${id}` : `/trader-orders/create/${id}`)}
           >
             {status === "In Auction" ? (
               <>
-                <Gavel className="h-4 w-4 mr-1" />
+                <Gavel className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                 Bid
               </>
             ) : (
               <>
-                <ShoppingCart className="h-4 w-4 mr-1" />
+                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                 Buy
               </>
             )}

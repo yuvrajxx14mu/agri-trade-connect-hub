@@ -45,23 +45,23 @@ const NotificationItem = ({
   const getIcon = () => {
     switch (type) {
       case "order":
-        return <ShoppingCart className="h-5 w-5" />;
+        return <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />;
       case "bid":
-        return <Gavel className="h-5 w-5" />;
+        return <Gavel className="h-4 w-4 sm:h-5 sm:w-5" />;
       case "auction":
-        return <Gavel className="h-5 w-5" />;
+        return <Gavel className="h-4 w-4 sm:h-5 sm:w-5" />;
       case "shipment":
-        return <Truck className="h-5 w-5" />;
+        return <Truck className="h-4 w-4 sm:h-5 sm:w-5" />;
       case "appointment":
-        return <Calendar className="h-5 w-5" />;
+        return <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />;
       case "alert":
-        return <AlertTriangle className="h-5 w-5" />;
+        return <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5" />;
       case "success":
-        return <CheckCircle className="h-5 w-5" />;
+        return <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />;
       case "reminder":
-        return <Clock className="h-5 w-5" />;
+        return <Clock className="h-4 w-4 sm:h-5 sm:w-5" />;
       default:
-        return <Bell className="h-5 w-5" />;
+        return <Bell className="h-4 w-4 sm:h-5 sm:w-5" />;
     }
   };
 
@@ -91,25 +91,25 @@ const NotificationItem = ({
   return (
     <div 
       className={cn(
-        "flex items-start p-4 gap-3 border-b cursor-pointer transition-colors hover:bg-muted/50",
+        "flex items-start p-3 sm:p-4 gap-2 sm:gap-3 border-b cursor-pointer transition-colors hover:bg-muted/50",
         !read && "bg-muted/30"
       )}
       onClick={onClick}
     >
-      <div className={cn("p-2 rounded-full", getIconColor())}>
+      <div className={cn("p-1.5 sm:p-2 rounded-full", getIconColor())}>
         {getIcon()}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-start">
-          <h4 className={cn("font-medium", !read && "font-semibold")}>{title}</h4>
-          <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+          <h4 className={cn("font-medium text-sm sm:text-base", !read && "font-semibold")}>{title}</h4>
+          <span className="text-xxs sm:text-xs text-muted-foreground whitespace-nowrap ml-2">
             {formatDistanceToNow(time, { addSuffix: true })}
           </span>
         </div>
-        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{message}</p>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-2">{message}</p>
       </div>
       {!read && (
-        <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
+        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 mt-1.5 sm:mt-2"></div>
       )}
     </div>
   );

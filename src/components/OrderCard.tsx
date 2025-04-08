@@ -68,40 +68,40 @@ const OrderCard = ({
   return (
     <Card className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
       <CardContent className="p-0">
-        <div className="p-4 border-b">
+        <div className="p-3 sm:p-4 border-b">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="font-medium">{id}</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="font-medium text-sm sm:text-base">{id}</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 {formatDate(orderDate)}
               </p>
             </div>
-            <div className="flex flex-col gap-2 items-end">
-              <Badge variant="outline" className={getStatusColor(status)}>
+            <div className="flex flex-col gap-1 sm:gap-2 items-end">
+              <Badge variant="outline" className={`text-xxs sm:text-xs ${getStatusColor(status)}`}>
                 {status.charAt(0).toUpperCase() + status.slice(1)}
               </Badge>
-              <Badge variant="outline" className={getPaymentStatusColor(paymentStatus)}>
+              <Badge variant="outline" className={`text-xxs sm:text-xs ${getPaymentStatusColor(paymentStatus)}`}>
                 {paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}
               </Badge>
             </div>
           </div>
         </div>
-        <div className="p-4 flex items-center space-x-4">
-          <Avatar>
+        <div className="p-3 sm:p-4 flex items-center space-x-2 sm:space-x-4">
+          <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
             <AvatarImage src={customer.avatar} alt={customer.name} />
-            <AvatarFallback>{customer.initials}</AvatarFallback>
+            <AvatarFallback className="text-xs sm:text-sm">{customer.initials}</AvatarFallback>
           </Avatar>
-          <div className="flex-1">
-            <h4 className="font-medium">{customer.name}</h4>
-            <p className="text-sm text-muted-foreground">
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-sm sm:text-base truncate">{customer.name}</h4>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">
               {products.length === 1
                 ? products[0].name
                 : `${products[0].name} and ${products.length - 1} more`}
             </p>
           </div>
           <div className="text-right">
-            <p className="font-semibold">{totalAmount}</p>
-            <p className="text-sm text-muted-foreground">Total</p>
+            <p className="font-semibold text-sm sm:text-base">{totalAmount}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
           </div>
         </div>
       </CardContent>
