@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -12,9 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { Gavel, Calendar, MapPin, Package, Tag, Clock, ArrowLeft, ArrowBigUp, User, UserCheck } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock auction data
 const auctionData = {
   id: "A1",
   product: "Organic Wheat",
@@ -57,8 +55,6 @@ const AuctionPage = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // In a real app, determine user role from authentication
-    // For demo, we'll set based on URL
     const path = window.location.pathname;
     if (path.includes("farmer")) {
       setUserRole("farmer");

@@ -82,7 +82,7 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
                 {menuItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton 
-                      active={activeItem === item.url}
+                      isActive={activeItem === item.url}
                       onClick={() => {
                         navigate(item.url);
                         setActiveItem(item.url);
