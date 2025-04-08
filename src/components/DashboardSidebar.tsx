@@ -88,8 +88,10 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
                         setActiveItem(item.url);
                       }}
                     >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
+                      <div className="flex items-center gap-2">
+                        <item.icon className="h-5 w-5" />
+                        <span>{item.title}</span>
+                      </div>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -101,14 +103,18 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => navigate("/settings")}>
-                    <Settings className="h-5 w-5" />
-                    <span>Settings</span>
+                    <div className="flex items-center gap-2">
+                      <Settings className="h-5 w-5" />
+                      <span>Settings</span>
+                    </div>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => navigate("/")}>
-                    <LogOut className="h-5 w-5" />
-                    <span>Log out</span>
+                    <div className="flex items-center gap-2">
+                      <LogOut className="h-5 w-5" />
+                      <span>Log out</span>
+                    </div>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
