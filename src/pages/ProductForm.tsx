@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -71,11 +70,12 @@ const ProductForm = () => {
         
         <DashboardHeader 
           title={isEditMode ? "Edit Product" : "Add New Product"} 
-          userName="Rajesh Kumar" 
+          userName="Rajesh Kumar"
+          userRole="farmer"
         />
       </div>
       
-      <Card>
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>{isEditMode ? "Edit Product Details" : "Product Details"}</CardTitle>
           <CardDescription>
@@ -221,7 +221,8 @@ const ProductForm = () => {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-between">
+          
+          <CardFooter className="flex justify-end gap-4">
             <Button 
               variant="outline" 
               type="button"

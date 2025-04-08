@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -13,56 +12,56 @@ const notifications = [
     id: "n1",
     title: "New Auction Available",
     message: "Rajesh Kumar has listed 20 Quintals of Organic Wheat for auction.",
-    time: "10 minutes ago",
-    type: "auction",
+    time: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
+    type: "auction" as const,
     read: false
   },
   {
     id: "n2",
     title: "Bid Update",
     message: "Your bid for Premium Rice has been outbid by another trader.",
-    time: "35 minutes ago",
-    type: "bid",
+    time: new Date(Date.now() - 35 * 60 * 1000), // 35 minutes ago
+    type: "bid" as const,
     read: false
   },
   {
     id: "n3",
     title: "Auction Ending Soon",
     message: "An auction for Yellow Lentils you're participating in ends in 2 hours.",
-    time: "1 hour ago",
-    type: "auction",
+    time: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
+    type: "auction" as const,
     read: false
   },
   {
     id: "n4",
     title: "Order Confirmed",
     message: "Your order #ORD123456 for Organic Wheat has been confirmed.",
-    time: "3 hours ago",
-    type: "order",
+    time: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
+    type: "order" as const,
     read: true
   },
   {
     id: "n5",
     title: "Shipment Update",
     message: "Your order #ORD123457 has been shipped and is on the way.",
-    time: "5 hours ago",
-    type: "shipment",
+    time: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+    type: "shipment" as const,
     read: true
   },
   {
     id: "n6",
     title: "Price Alert",
     message: "Prices for Rice have decreased by 5% in the last 24 hours.",
-    time: "Yesterday",
-    type: "price",
+    time: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+    type: "alert" as const,
     read: true
   },
   {
     id: "n7",
     title: "Appointment Reminder",
     message: "You have a product inspection meeting with Meena Patel tomorrow at 10:00 AM.",
-    time: "Yesterday",
-    type: "appointment",
+    time: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+    type: "appointment" as const,
     read: true
   }
 ];
@@ -98,7 +97,7 @@ const TraderNotifications = () => {
   
   return (
     <DashboardLayout userRole="trader">
-      <DashboardHeader title="Notifications" userName="Vikram Sharma" />
+      <DashboardHeader title="Notifications" userName="Vikram Sharma" userRole="trader" />
       
       <Card>
         <CardHeader className="flex flex-col sm:flex-row justify-between sm:items-center">
@@ -147,7 +146,7 @@ const TraderNotifications = () => {
                     time={notification.time}
                     type={notification.type}
                     read={notification.read}
-                    onMarkAsRead={() => markAsRead(notification.id)}
+                    onClick={() => markAsRead(notification.id)}
                   />
                 ))
               ) : (

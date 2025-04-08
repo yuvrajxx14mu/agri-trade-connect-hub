@@ -1,4 +1,3 @@
-
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import { ReactNode } from "react";
@@ -10,12 +9,16 @@ interface DashboardLayoutProps {
 
 const DashboardLayout = ({ children, userRole }: DashboardLayoutProps) => {
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex flex-col md:flex-row w-full">
-        <DashboardSidebar userRole={userRole} />
-        <main className="flex-1 p-6 md:p-8 ml-0 md:ml-64 mt-16 md:mt-0">
-          {children}
-        </main>
+    <SidebarProvider defaultOpen={true}>
+      <div className="flex h-screen bg-background overflow-hidden">
+        <div className="fixed left-0 top-0 h-full">
+          <DashboardSidebar userRole={userRole} />
+        </div>
+        <div className="flex-1 overflow-auto ml-64">
+          <main className="p-6 md:p-8 w-full">
+            {children}
+          </main>
+        </div>
       </div>
     </SidebarProvider>
   );

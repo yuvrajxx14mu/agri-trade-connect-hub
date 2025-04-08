@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -25,6 +24,14 @@ const FarmerProducts = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   
+  const handleDeleteProduct = (productId: string) => {
+    // TODO: Implement delete functionality with confirmation
+    if (window.confirm("Are you sure you want to delete this product?")) {
+      // Here you would typically make an API call to delete the product
+      console.log("Deleting product:", productId);
+    }
+  };
+
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -125,11 +132,21 @@ const FarmerProducts = () => {
                             <Pencil className="h-4 w-4" />
                           </Button>
                           {product.status === "Listed" && (
-                            <Button variant="ghost" size="icon" onClick={() => navigate(`/farmer-products/${product.id}/auction`)}>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => navigate(`/farmer-products/${product.id}/auction`)}
+                              className="hover:bg-blue-50"
+                            >
                               <Gavel className="h-4 w-4" />
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" className="text-destructive">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-destructive hover:bg-red-50"
+                            onClick={() => handleDeleteProduct(product.id)}
+                          >
                             <Trash className="h-4 w-4" />
                           </Button>
                         </div>

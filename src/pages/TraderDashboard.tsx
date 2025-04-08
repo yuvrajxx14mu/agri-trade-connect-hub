@@ -1,4 +1,3 @@
-
 import { BarChart3, Wallet, ShoppingCart, Gavel, ArrowUpRight, Search, ShoppingBag } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -33,7 +32,7 @@ const TraderDashboard = () => {
   
   return (
     <DashboardLayout userRole="trader">
-      <DashboardHeader title="Trader Dashboard" userName="Vikram Sharma" />
+      <DashboardHeader title="Trader Dashboard" userName="Vikram Sharma" userRole="trader" />
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard 
