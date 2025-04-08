@@ -9,77 +9,144 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { useNavigate } from "react-router-dom";
-
-const activeAuctions = [
-  { id: "A1", product: "Organic Wheat", farmer: "Rajesh Kumar", quantity: "20 Quintals", currentBid: "₹2,450/Quintal", timeLeft: "2 hours" },
-  { id: "A2", product: "Premium Rice", farmer: "Anand Singh", quantity: "15 Quintals", currentBid: "₹3,600/Quintal", timeLeft: "45 minutes" },
-  { id: "A3", product: "Red Chillies", farmer: "Meena Patel", quantity: "5 Quintals", currentBid: "₹12,000/Quintal", timeLeft: "3 hours" },
-  { id: "A4", product: "Yellow Lentils", farmer: "Suresh Verma", quantity: "10 Quintals", currentBid: "₹9,200/Quintal", timeLeft: "1 hour" },
-];
-
-const productCategories = [
-  { name: "Cereals", value: 35 },
-  { name: "Pulses", value: 25 },
-  { name: "Fruits", value: 15 },
-  { name: "Vegetables", value: 20 },
-  { name: "Spices", value: 5 },
-];
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/utils";
 
 const COLORS = ['#2D6A4F', '#40916C', '#52B788', '#74C69D', '#95D5B2'];
 
 const TraderDashboard = () => {
   const navigate = useNavigate();
-  
+  const { profile } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState({
+    activeAuctions: [],
+    productCategories: [],
+    totalOrders: 0,
+    totalRevenue: 0,
+    pendingOrders: 0,
+    recentOrders: []
+  });
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!profile?.id) return;
+
+      try {
+        // Fetch active auctions
+        const { data: auctions } = await supabase
+          .from('products')
+          .select(`
+            id,
+            name,
+            quantity,
+            unit,
+            price,
+            status,
+            farmer_id,
+            profiles(name)
+          `)
+          .eq('status', 'in_auction')
+          .order('created_at', { ascending: false })
+          .limit(4);
+
+        // Fetch orders statistics
+        const { data: orders } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('trader_id', profile.id);
+
+        // Calculate product categories distribution
+        const { data: products } = await supabase
+          .from('products')
+          .select('category')
+          .eq('status', 'active');
+
+        // Process product categories
+        const categoryCounts = products?.reduce((acc, product) => {
+          acc[product.category] = (acc[product.category] || 0) + 1;
+          return acc;
+        }, {});
+
+        const totalProducts = products?.length || 0;
+        const productCategories = Object.entries(categoryCounts || {}).map(([name, count]) => ({
+          name,
+          value: Math.round((count as number / totalProducts) * 100)
+        }));
+
+        // Calculate order statistics
+        const totalOrders = orders?.length || 0;
+        const totalRevenue = orders?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
+        const pendingOrders = orders?.filter(order => order.status === 'pending').length || 0;
+
+        // Get recent orders
+        const recentOrders = orders?.slice(0, 3) || [];
+
+        setDashboardData({
+          activeAuctions: auctions || [],
+          productCategories,
+          totalOrders,
+          totalRevenue,
+          pendingOrders,
+          recentOrders
+        });
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [profile?.id]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout userRole="trader">
+        <DashboardHeader title="Trader Dashboard" userName={profile?.name || ""} userRole="trader" />
+        <div>Loading...</div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout userRole="trader">
-      <DashboardHeader title="Trader Dashboard" userName="Vikram Sharma" userRole="trader" />
+      <DashboardHeader title="Trader Dashboard" userName={profile?.name || ""} userRole="trader" />
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard 
+          title="Total Orders" 
+          value={dashboardData.totalOrders.toString()} 
+          icon={ShoppingCart}
+          change={{ value: "12%", positive: true }}
+        />
+        <StatCard 
           title="Active Auctions" 
-          value="24" 
+          value={dashboardData.activeAuctions.length.toString()} 
           icon={Gavel}
-          change={{ value: "5", positive: true }}
-          className="border-l-4 border-agri-trader"
+          change={{ value: "2", positive: true }}
         />
         <StatCard 
-          title="Purchased Items" 
-          value="18" 
-          icon={ShoppingBag}
-          change={{ value: "3", positive: true }}
-          className="border-l-4 border-agri-trader"
-        />
-        <StatCard 
-          title="Total Spent" 
-          value="₹2,45,600" 
+          title="Total Revenue" 
+          value={formatCurrency(dashboardData.totalRevenue)} 
           icon={Wallet}
-          change={{ value: "12.5%", positive: true }}
-          className="border-l-4 border-agri-trader"
+          change={{ value: "8.5%", positive: true }}
         />
         <StatCard 
           title="Pending Orders" 
-          value="3" 
-          icon={ShoppingCart}
+          value={dashboardData.pendingOrders.toString()} 
+          icon={ShoppingBag}
           change={{ value: "1", positive: false }}
-          className="border-l-4 border-agri-trader"
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card className="md:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
           <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between md:items-center">
-              <div>
-                <CardTitle>Active Auctions</CardTitle>
-                <CardDescription>Auctions currently open for bidding</CardDescription>
-              </div>
-              <Button 
-                onClick={() => navigate("/trader-auctions")}
-                className="mt-2 md:mt-0"
-              >
-                View All
-              </Button>
-            </div>
+            <CardTitle>Active Auctions</CardTitle>
+            <CardDescription>Current auctions you can participate in</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -89,30 +156,23 @@ const TraderDashboard = () => {
                   <TableHead>Quantity</TableHead>
                   <TableHead>Current Bid</TableHead>
                   <TableHead>Time Left</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activeAuctions.slice(0, 3).map((auction) => (
+                {dashboardData.activeAuctions.map((auction) => (
                   <TableRow key={auction.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{auction.product}</div>
-                        <div className="text-xs text-muted-foreground">by {auction.farmer}</div>
+                        <div className="font-medium">{auction.name}</div>
+                        <div className="text-xs text-muted-foreground">by {auction.profiles?.name}</div>
                       </div>
                     </TableCell>
-                    <TableCell>{auction.quantity}</TableCell>
-                    <TableCell className="font-medium">{auction.currentBid}</TableCell>
+                    <TableCell>{`${auction.quantity} ${auction.unit}`}</TableCell>
+                    <TableCell className="font-medium">{formatCurrency(auction.price)}/{auction.unit}</TableCell>
                     <TableCell>
-                      <Badge 
-                        variant="outline" 
-                        className={
-                          parseInt(auction.timeLeft) < 1 
-                            ? "bg-red-50 text-red-700 border-red-200" 
-                            : "bg-yellow-50 text-yellow-700 border-yellow-200"
-                        }
-                      >
-                        {auction.timeLeft}
+                      <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                        Active
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -134,15 +194,15 @@ const TraderDashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Categories Overview</CardTitle>
-            <CardDescription>Product categories in the marketplace</CardDescription>
+            <CardTitle>Product Categories</CardTitle>
+            <CardDescription>Distribution of available products</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[220px]">
+            <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={productCategories}
+                    data={dashboardData.productCategories}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -150,7 +210,7 @@ const TraderDashboard = () => {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {productCategories.map((entry, index) => (
+                    {dashboardData.productCategories.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -163,7 +223,7 @@ const TraderDashboard = () => {
         </Card>
       </div>
 
-      <Card>
+      <Card className="mt-6">
         <CardHeader>
           <CardTitle>Quick Market Search</CardTitle>
           <CardDescription>Find products by name, type, or farmer</CardDescription>
@@ -184,12 +244,16 @@ const TraderDashboard = () => {
             </Button>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Badge variant="outline" className="cursor-pointer hover:bg-muted">Wheat</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-muted">Rice</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-muted">Organic</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-muted">Pulses</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-muted">Spices</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-muted">Vegetables</Badge>
+            {dashboardData.productCategories.map((category) => (
+              <Badge 
+                key={category.name}
+                variant="outline" 
+                className="cursor-pointer hover:bg-muted"
+                onClick={() => navigate(`/trader-market?category=${category.name}`)}
+              >
+                {category.name}
+              </Badge>
+            ))}
           </div>
         </CardContent>
       </Card>

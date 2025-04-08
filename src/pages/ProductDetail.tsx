@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -22,61 +21,108 @@ import {
   ClipboardList,
   Gavel,
   ShoppingCart,
-  MessageCircle
+  MessageCircle,
+  Loader2
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/utils";
 
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { profile } = useAuth();
   const [userRole, setUserRole] = useState<"farmer" | "trader">("farmer");
+  const [loading, setLoading] = useState(true);
+  const [product, setProduct] = useState<any>(null);
   
-  // This would normally be fetched from an API
-  const product = {
-    id: id || "P1",
-    name: "Organic Wheat",
-    description: "High-quality organic wheat grown without pesticides. Perfect for making premium flour and baking products.",
-    category: "Cereals",
-    quantity: "20 Quintals",
-    price: "₹2,200/Quintal",
-    location: "Amritsar, Punjab",
-    status: "Listed",
-    harvestDate: "Mar 15, 2025",
-    shelfLife: "12 months",
-    owner: {
-      name: "Rajesh Kumar",
-      location: "Amritsar, Punjab",
-      rating: 4.8,
-      verified: true,
-      image: ""
-    },
-    specifications: [
-      { label: "Type", value: "Organic" },
-      { label: "Variety", value: "HD-2967" },
-      { label: "Moisture", value: "12%" },
-      { label: "Protein Content", value: "11.5%" },
-      { label: "Certification", value: "Organic India" },
-      { label: "Cultivation Method", value: "Natural Farming" },
-      { label: "Harvest Season", value: "Rabi 2024" },
-    ],
-    priceHistory: [
-      { date: "Jan 2025", price: 2100 },
-      { date: "Feb 2025", price: 2150 },
-      { date: "Mar 2025", price: 2200 },
-    ]
-  };
+  useEffect(() => {
+    const fetchProduct = async () => {
+      if (!id) return;
+      
+      try {
+        // First fetch the product details
+        const { data: productData, error: productError } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', id)
+          .single();
+          
+        if (productError) throw productError;
+        
+        if (!productData) {
+          toast({
+            title: "Error",
+            description: "Product not found",
+            variant: "destructive"
+          });
+          navigate(userRole === "farmer" ? "/farmer-products" : "/trader-market");
+          return;
+        }
+
+        // Then fetch the farmer's profile
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            name
+          `)
+          .eq('id', productData.farmer_id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+        }
+        
+        // Combine the data
+        setProduct({
+          ...productData,
+          profiles: profileData || null
+        });
+      } catch (error) {
+        console.error('Error fetching product:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load product details",
+          variant: "destructive"
+        });
+        navigate(userRole === "farmer" ? "/farmer-products" : "/trader-market");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchProduct();
+  }, [id, userRole, navigate, toast]);
   
   // Detect user role from URL 
-  useState(() => {
+  useEffect(() => {
     if (window.location.pathname.includes("farmer")) {
       setUserRole("farmer");
     } else {
       setUserRole("trader");
     }
-  });
+  }, []);
+  
+  if (loading) {
+    return (
+      <DashboardLayout userRole={userRole}>
+        <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+  
+  if (!product) {
+    return null;
+  }
   
   const renderFarmerActions = () => (
     <div className="flex flex-col sm:flex-row gap-3">
-      {product.status === "Listed" && (
+      {product.status === "active" && (
         <Button onClick={() => navigate(`/farmer-products/${id}/auction`)}>
           <Gavel className="mr-2 h-4 w-4" />
           Create Auction
@@ -95,12 +141,12 @@ const ProductDetail = () => {
   
   const renderTraderActions = () => (
     <div className="flex flex-col sm:flex-row gap-3">
-      {product.status === "Listed" ? (
+      {product.status === "active" ? (
         <Button className="bg-agri-trader" onClick={() => navigate(`/trader-orders/create/${id}`)}>
           <ShoppingCart className="mr-2 h-4 w-4" />
           Purchase Now
         </Button>
-      ) : product.status === "In Auction" && (
+      ) : product.status === "auction" && (
         <Button className="bg-agri-trader" onClick={() => navigate(`/trader-auctions/${id}`)}>
           <Gavel className="mr-2 h-4 w-4" />
           View Auction
@@ -129,7 +175,7 @@ const ProductDetail = () => {
         
         <DashboardHeader 
           title="Product Details" 
-          userName={userRole === "farmer" ? "Rajesh Kumar" : "Vikram Sharma"} 
+          userName={profile?.name || "User"} 
         />
       </div>
       
@@ -140,28 +186,28 @@ const ProductDetail = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <CardTitle className="text-2xl">{product.name}</CardTitle>
-                  <CardDescription className="mt-2">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center">
-                        <Tag className="mr-1 h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">{product.category}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <MapPin className="mr-1 h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">{product.location}</span>
-                      </div>
-                    </div>
-                  </CardDescription>
+                  <div className="flex items-center space-x-4 mt-2">
+                    <span className="flex items-center">
+                      <Tag className="mr-1 h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">{product.category}</span>
+                    </span>
+                    <span className="flex items-center">
+                      <MapPin className="mr-1 h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">{product.location}</span>
+                    </span>
+                  </div>
                 </div>
                 <Badge 
-                  className={product.status === "Listed" 
+                  className={product.status === "active" 
                     ? "bg-yellow-50 text-yellow-700 border-yellow-200" 
-                    : product.status === "In Auction" 
+                    : product.status === "auction" 
                     ? "bg-blue-50 text-blue-700 border-blue-200"
                     : "bg-green-50 text-green-700 border-green-200"}
                   variant="outline"
                 >
-                  {product.status}
+                  {product.status === "active" ? "Listed" : 
+                   product.status === "auction" ? "In Auction" : 
+                   product.status.charAt(0).toUpperCase() + product.status.slice(1)}
                 </Badge>
               </div>
             </CardHeader>
@@ -170,16 +216,16 @@ const ProductDetail = () => {
                 <div className="flex flex-col sm:flex-row justify-between">
                   <div>
                     <div className="text-sm font-medium mb-1">Quantity Available</div>
-                    <div className="text-2xl font-bold">{product.quantity}</div>
+                    <div className="text-2xl font-bold">{product.quantity} {product.unit}</div>
                   </div>
                   <div className="mt-4 sm:mt-0">
-                    <div className="text-sm font-medium mb-1">Price Per Quintal</div>
-                    <div className="text-2xl font-bold">{product.price}</div>
+                    <div className="text-sm font-medium mb-1">Price Per {product.unit}</div>
+                    <div className="text-2xl font-bold">{formatCurrency(product.price)}</div>
                   </div>
                 </div>
               </div>
               
-              <Tabs defaultValue="details">
+              <Tabs defaultValue="details" className="w-full">
                 <TabsList className="grid grid-cols-3 w-full">
                   <TabsTrigger value="details">Details</TabsTrigger>
                   <TabsTrigger value="specifications">Specifications</TabsTrigger>
@@ -197,7 +243,7 @@ const ProductDetail = () => {
                         <CalendarDays className="h-5 w-5 text-muted-foreground" />
                         <div>
                           <p className="text-sm font-medium">Harvest Date</p>
-                          <p className="text-sm text-muted-foreground">{product.harvestDate}</p>
+                          <p className="text-sm text-muted-foreground">{new Date(product.harvest_date).toLocaleDateString()}</p>
                         </div>
                       </div>
                     </div>
@@ -206,7 +252,7 @@ const ProductDetail = () => {
                         <ClipboardList className="h-5 w-5 text-muted-foreground" />
                         <div>
                           <p className="text-sm font-medium">Shelf Life</p>
-                          <p className="text-sm text-muted-foreground">{product.shelfLife}</p>
+                          <p className="text-sm text-muted-foreground">{product.shelf_life}</p>
                         </div>
                       </div>
                     </div>
@@ -217,12 +263,22 @@ const ProductDetail = () => {
                   <div className="space-y-4">
                     <h3 className="font-medium">Product Specifications</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {product.specifications.map((spec, index) => (
-                        <div key={index} className="flex justify-between border-b pb-2">
-                          <span className="text-sm text-muted-foreground">{spec.label}</span>
-                          <span className="text-sm font-medium">{spec.value}</span>
-                        </div>
-                      ))}
+                      <div className="flex justify-between border-b pb-2">
+                        <span className="text-sm text-muted-foreground">Type</span>
+                        <span className="text-sm font-medium">{product.quality}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-2">
+                        <span className="text-sm text-muted-foreground">Category</span>
+                        <span className="text-sm font-medium">{product.category}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-2">
+                        <span className="text-sm text-muted-foreground">Location</span>
+                        <span className="text-sm font-medium">{product.location}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-2">
+                        <span className="text-sm text-muted-foreground">Quantity</span>
+                        <span className="text-sm font-medium">{product.quantity} {product.unit}</span>
+                      </div>
                     </div>
                   </div>
                 </TabsContent>
@@ -234,12 +290,10 @@ const ProductDetail = () => {
                       <BarChart3 className="h-12 w-12 text-muted-foreground" />
                     </div>
                     <div className="space-y-2">
-                      {product.priceHistory.map((item, index) => (
-                        <div key={index} className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">{item.date}</span>
-                          <span className="text-sm font-medium">₹{item.price}/Quintal</span>
-                        </div>
-                      ))}
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Current Price</span>
+                        <span className="text-sm font-medium">{formatCurrency(product.price)}/{product.unit}</span>
+                      </div>
                     </div>
                   </div>
                 </TabsContent>
@@ -259,31 +313,16 @@ const ProductDetail = () => {
             <CardContent>
               <div className="flex items-center space-x-4 mb-4">
                 <Avatar className="h-12 w-12">
-                  <AvatarImage src={product.owner.image} alt={product.owner.name} />
+                  <AvatarImage src={product.profiles?.image} alt={product.profiles?.name} />
                   <AvatarFallback>
-                    {product.owner.name.split(' ').map(n => n[0]).join('')}
+                    {product.profiles?.name?.split(' ').map(n => n[0]).join('')}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <div className="font-medium">{product.owner.name}</div>
-                  <div className="text-sm text-muted-foreground">{product.owner.location}</div>
+                  <div className="font-medium">{product.profiles?.name}</div>
+                  <div className="text-sm text-muted-foreground">{product.location}</div>
                 </div>
               </div>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm">Rating</span>
-                  <span className="text-sm font-medium">{product.owner.rating}/5</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Verification</span>
-                  <span className="text-sm font-medium">
-                    {product.owner.verified ? "Verified Seller" : "Unverified"}
-                  </span>
-                </div>
-              </div>
-              
-              <Separator className="my-4" />
               
               <div className="space-y-3">
                 <div className="text-sm font-medium">Contact Information</div>
@@ -304,9 +343,9 @@ const ProductDetail = () => {
                 <Truck className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div>
                   <div className="text-sm font-medium">Shipping Available</div>
-                  <p className="text-sm text-muted-foreground">
+                  <div className="text-sm text-muted-foreground">
                     The seller provides shipping across Punjab, Haryana, and Delhi NCR.
-                  </p>
+                  </div>
                 </div>
               </div>
               
@@ -314,9 +353,9 @@ const ProductDetail = () => {
                 <ClipboardList className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div>
                   <div className="text-sm font-medium">Shipping Policy</div>
-                  <p className="text-sm text-muted-foreground">
+                  <div className="text-sm text-muted-foreground">
                     Shipping costs vary by location. Delivery typically takes 2-5 business days after order confirmation.
-                  </p>
+                  </div>
                 </div>
               </div>
             </CardContent>

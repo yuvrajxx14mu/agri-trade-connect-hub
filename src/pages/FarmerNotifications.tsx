@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,92 +16,164 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Bell, CheckCheck, BellOff } from "lucide-react";
 import NotificationItem from "@/components/NotificationItem";
 
-const notificationsData = [
-  { 
-    id: "N1", 
-    type: "bid", 
-    title: "New Bid Received", 
-    message: "Vikram Sharma placed a bid of ₹2,450/Quintal on your Organic Wheat auction.",
-    time: new Date(2025, 3, 7, 14, 30), 
-    read: false 
-  },
-  { 
-    id: "N2", 
-    type: "order", 
-    title: "New Order Placed", 
-    message: "Your Premium Rice has been ordered by Amit Patel. Check order #O123 for details.",
-    time: new Date(2025, 3, 7, 10, 15), 
-    read: false 
-  },
-  { 
-    id: "N3", 
-    type: "shipment", 
-    title: "Shipment Update", 
-    message: "The shipment for order #O118 has been picked up by the delivery partner.",
-    time: new Date(2025, 3, 6, 16, 45), 
-    read: true 
-  },
-  { 
-    id: "N4", 
-    type: "auction", 
-    title: "Auction Ended", 
-    message: "Your Yellow Lentils auction has ended. The highest bid was ₹9,200/Quintal from Sunil Mehta.",
-    time: new Date(2025, 3, 6, 12, 0), 
-    read: true 
-  },
-  { 
-    id: "N5", 
-    type: "alert", 
-    title: "Price Alert", 
-    message: "The market price for Wheat in Amritsar has increased by 5% in the last week.",
-    time: new Date(2025, 3, 5, 9, 30), 
-    read: true 
-  },
-  { 
-    id: "N6", 
-    type: "appointment", 
-    title: "Appointment Reminder", 
-    message: "You have a meeting scheduled with Karan Agarwal tomorrow at 11:00 AM.",
-    time: new Date(2025, 3, 5, 8, 0), 
-    read: true 
-  },
-  { 
-    id: "N7", 
-    type: "success", 
-    title: "Payment Received", 
-    message: "Payment of ₹45,000 has been credited to your account for order #O115.",
-    time: new Date(2025, 3, 4, 14, 20), 
-    read: true 
-  },
-];
-
-const notificationSettings = {
-  email: {
-    bids: true,
-    orders: true,
-    shipments: true,
-    pricingAlerts: true,
-    appointments: true,
-    promotions: false,
-  },
-  push: {
-    bids: true,
-    orders: true,
-    shipments: true,
-    pricingAlerts: true,
-    appointments: true,
-    promotions: false,
-  }
-};
-
 const FarmerNotifications = () => {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("notifications");
   const [filterType, setFilterType] = useState("all");
-  const [notifications, setNotifications] = useState(notificationsData);
-  const [settings, setSettings] = useState(notificationSettings);
-  
+  const [notifications, setNotifications] = useState([]);
+  const [settings, setSettings] = useState({
+    email: {
+      bids: true,
+      orders: true,
+      shipments: true,
+      pricingAlerts: true,
+      appointments: true,
+      promotions: false,
+    },
+    push: {
+      bids: true,
+      orders: true,
+      shipments: true,
+      pricingAlerts: true,
+      appointments: true,
+      promotions: false,
+    }
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', profile?.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Transform the data to match the expected format
+        const transformedNotifications = data.map(notification => ({
+          id: notification.id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          time: new Date(notification.created_at),
+          read: notification.is_read
+        }));
+
+        setNotifications(transformedNotifications);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (profile?.id) {
+      fetchNotifications();
+    }
+  }, [profile?.id]);
+
+  const fetchNotificationSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('notification_settings')
+        .select('*')
+        .eq('user_id', profile?.id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No settings exist yet, create default settings
+          const defaultSettings = {
+            email: {
+              bids: true,
+              orders: true,
+              shipments: true,
+              pricingAlerts: true,
+              appointments: true,
+              promotions: false,
+            },
+            push: {
+              bids: true,
+              orders: true,
+              shipments: true,
+              pricingAlerts: true,
+              appointments: true,
+              promotions: false,
+            }
+          };
+
+          const { error: insertError } = await supabase
+            .from('notification_settings')
+            .insert({
+              user_id: profile?.id,
+              settings: defaultSettings
+            });
+
+          if (!insertError) {
+            setSettings(defaultSettings);
+          } else {
+            console.error('Error creating default notification settings:', insertError);
+          }
+        } else {
+          console.error('Error fetching notification settings:', error);
+        }
+        return;
+      }
+
+      setSettings(data.settings);
+    } catch (err) {
+      console.error('Error fetching notification settings:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (profile?.id) {
+      fetchNotificationSettings();
+    }
+  }, [profile?.id]);
+
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+
+      if (error) throw error;
+
+      setNotifications(notifications.map(notification =>
+        notification.id === notificationId
+          ? { ...notification, read: true }
+          : notification
+      ));
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
+  const handleUpdateSettings = async (newSettings) => {
+    try {
+      const { error } = await supabase
+        .from('notification_settings')
+        .upsert({
+          user_id: profile?.id,
+          settings: newSettings
+        });
+
+      if (error) throw error;
+
+      setSettings(newSettings);
+    } catch (err) {
+      console.error('Error updating notification settings:', err);
+    }
+  };
+
   const filteredNotifications = notifications.filter(notification => {
     const matchesSearch = 
       notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -116,13 +190,7 @@ const FarmerNotifications = () => {
   const unreadCount = notifications.filter(n => !n.read).length;
   
   const handleNotificationClick = (id: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
-          ? { ...notification, read: true } 
-          : notification
-      )
-    );
+    handleMarkAsRead(id);
     
     // Navigate based on notification type
     const notification = notifications.find(n => n.id === id);
@@ -149,31 +217,51 @@ const FarmerNotifications = () => {
   };
   
   const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notification => ({ ...notification, read: true }))
-    );
+    handleUpdateSettings({
+      email: {
+        ...settings.email,
+        bids: true,
+        orders: true,
+        shipments: true,
+        pricingAlerts: true,
+        appointments: true,
+        promotions: true,
+      },
+      push: {
+        ...settings.push,
+        bids: true,
+        orders: true,
+        shipments: true,
+        pricingAlerts: true,
+        appointments: true,
+        promotions: true,
+      }
+    });
   };
   
   const updateEmailSetting = (key: keyof typeof settings.email, value: boolean) => {
-    setSettings(prev => ({
-      ...prev,
+    handleUpdateSettings({
+      ...settings,
       email: {
-        ...prev.email,
+        ...settings.email,
         [key]: value
       }
-    }));
+    });
   };
   
   const updatePushSetting = (key: keyof typeof settings.push, value: boolean) => {
-    setSettings(prev => ({
-      ...prev,
+    handleUpdateSettings({
+      ...settings,
       push: {
-        ...prev.push,
+        ...settings.push,
         [key]: value
       }
-    }));
+    });
   };
   
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
   return (
     <DashboardLayout userRole="farmer">
       <DashboardHeader title="Notifications" userName="Rajesh Kumar" userRole="farmer" />

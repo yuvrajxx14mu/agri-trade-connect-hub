@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,82 +7,111 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { Download, FileText, BarChart3, TrendingUp, PieChart as PieChartIcon } from "lucide-react";
-
-// Sample data for purchase history
-const purchaseHistory = [
-  { month: 'Jan', amount: 125000 },
-  { month: 'Feb', amount: 145000 },
-  { month: 'Mar', amount: 135000 },
-  { month: 'Apr', amount: 178000 },
-  { month: 'May', amount: 165000 },
-  { month: 'Jun', amount: 190000 },
-  { month: 'Jul', amount: 210000 },
-  { month: 'Aug', amount: 195000 },
-  { month: 'Sep', amount: 220000 },
-  { month: 'Oct', amount: 250000 },
-  { month: 'Nov', amount: 235000 },
-  { month: 'Dec', amount: 245000 },
-];
-
-// Sample data for price trends
-const priceTrends = [
-  { week: 'Week 1', wheat: 2200, rice: 3500, lentils: 9000, potatoes: 1800 },
-  { week: 'Week 2', wheat: 2250, rice: 3550, lentils: 9100, potatoes: 1750 },
-  { week: 'Week 3', wheat: 2300, rice: 3500, lentils: 9200, potatoes: 1700 },
-  { week: 'Week 4', wheat: 2280, rice: 3600, lentils: 9150, potatoes: 1820 },
-  { week: 'Week 5', wheat: 2350, rice: 3650, lentils: 9050, potatoes: 1900 },
-  { week: 'Week 6', wheat: 2400, rice: 3700, lentils: 9000, potatoes: 1950 },
-  { week: 'Week 7', wheat: 2380, rice: 3750, lentils: 9100, potatoes: 1920 },
-  { week: 'Week 8', wheat: 2420, rice: 3800, lentils: 9150, potatoes: 1880 },
-];
-
-// Sample data for purchase distribution
-const purchaseDistribution = [
-  { name: 'Cereals', value: 45 },
-  { name: 'Pulses', value: 20 },
-  { name: 'Vegetables', value: 15 },
-  { name: 'Spices', value: 10 },
-  { name: 'Fruits', value: 10 },
-];
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 const COLORS = ['#2563EB', '#4F46E5', '#7C3AED', '#C026D3', '#DB2777'];
 
-// Sample reports list
-const reports = [
-  {
-    id: 'REP001',
-    title: 'Monthly Purchase Report - March 2025',
-    type: 'Purchase',
-    date: '01 Apr 2025',
-    fileSize: '1.5 MB'
-  },
-  {
-    id: 'REP002',
-    title: 'Quarterly Auction Participation Q1 2025',
-    type: 'Auction',
-    date: '05 Apr 2025',
-    fileSize: '2.1 MB'
-  },
-  {
-    id: 'REP003',
-    title: 'Product Price Analysis',
-    type: 'Price',
-    date: '15 Mar 2025',
-    fileSize: '0.9 MB'
-  },
-  {
-    id: 'REP004',
-    title: 'Annual Procurement Strategy 2025',
-    type: 'Strategy',
-    date: '20 Feb 2025',
-    fileSize: '2.3 MB'
-  }
-];
-
 const TraderReports = () => {
+  const { profile } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [purchaseHistory, setPurchaseHistory] = useState([]);
+  const [priceTrends, setPriceTrends] = useState([]);
+  const [purchaseDistribution, setPurchaseDistribution] = useState([]);
+  const [reports, setReports] = useState([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [yearFilter, setYearFilter] = useState("2025");
   
+  useEffect(() => {
+    const fetchReportData = async () => {
+      try {
+        // Fetch purchase history
+        const { data: purchaseData, error: purchaseError } = await supabase
+          .from('purchases')
+          .select('created_at, total_amount')
+          .eq('trader_id', profile?.id)
+          .order('created_at', { ascending: true });
+
+        if (purchaseError) throw purchaseError;
+
+        // Transform purchase data for the chart
+        const monthlyPurchases = purchaseData.reduce((acc, purchase) => {
+          const date = new Date(purchase.created_at);
+          const month = date.toLocaleString('default', { month: 'short' });
+          acc[month] = (acc[month] || 0) + purchase.total_amount;
+          return acc;
+        }, {});
+
+        const purchaseHistoryData = Object.entries(monthlyPurchases).map(([month, amount]) => ({
+          month,
+          amount
+        }));
+
+        // Fetch price trends
+        const { data: priceData, error: priceError } = await supabase
+          .from('price_history')
+          .select('*')
+          .order('created_at', { ascending: true })
+          .limit(8);
+
+        if (priceError) throw priceError;
+
+        const priceTrendsData = priceData.map((price, index) => ({
+          week: `Week ${index + 1}`,
+          wheat: price.wheat_price,
+          rice: price.rice_price,
+          lentils: price.lentils_price,
+          potatoes: price.potatoes_price
+        }));
+
+        // Fetch purchase distribution
+        const { data: distributionData, error: distributionError } = await supabase
+          .from('purchases')
+          .select('product_category, total_amount')
+          .eq('trader_id', profile?.id);
+
+        if (distributionError) throw distributionError;
+
+        const distribution = distributionData.reduce((acc, purchase) => {
+          acc[purchase.product_category] = (acc[purchase.product_category] || 0) + purchase.total_amount;
+          return acc;
+        }, {});
+
+        const total = Object.values(distribution).reduce((sum, amount) => sum + amount, 0);
+        const purchaseDistributionData = Object.entries(distribution).map(([name, value]) => ({
+          name,
+          value: Math.round((value / total) * 100)
+        }));
+
+        // Fetch reports
+        const { data: reportsData, error: reportsError } = await supabase
+          .from('reports')
+          .select('*')
+          .eq('trader_id', profile?.id)
+          .order('created_at', { ascending: false });
+
+        if (reportsError) throw reportsError;
+
+        setPurchaseHistory(purchaseHistoryData);
+        setPriceTrends(priceTrendsData);
+        setPurchaseDistribution(purchaseDistributionData);
+        setReports(reportsData);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (profile?.id) {
+      fetchReportData();
+    }
+  }, [profile?.id]);
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
   return (
     <DashboardLayout userRole="trader">
       <DashboardHeader title="Reports & Analytics" userName="Vikram Sharma" />

@@ -1,6 +1,7 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,70 +12,60 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Truck, Package } from "lucide-react";
 import ShipmentCard from "@/components/ShipmentCard";
 
-const shipments = [
-  {
-    id: "S123456",
-    orderId: "O123456",
-    trackingNumber: "TRK123456789",
-    items: [
-      { name: "Organic Wheat", quantity: 20 }
-    ],
-    status: "shipped" as const,
-    dispatchDate: new Date(2025, 3, 6),
-    estimatedDelivery: new Date(2025, 3, 10),
-    currentLocation: "Delhi",
-    destination: "Mumbai",
-    progress: 35
-  },
-  {
-    id: "S123457",
-    orderId: "O123457",
-    trackingNumber: "TRK123456790",
-    items: [
-      { name: "Premium Rice", quantity: 15 }
-    ],
-    status: "in_transit" as const,
-    dispatchDate: new Date(2025, 3, 5),
-    estimatedDelivery: new Date(2025, 3, 9),
-    currentLocation: "Karnal",
-    destination: "Bangalore",
-    progress: 65
-  },
-  {
-    id: "S123458",
-    orderId: "O123458",
-    trackingNumber: "TRK123456791",
-    items: [
-      { name: "Yellow Lentils", quantity: 10 }
-    ],
-    status: "out_for_delivery" as const,
-    dispatchDate: new Date(2025, 3, 4),
-    estimatedDelivery: new Date(2025, 3, 8),
-    currentLocation: "Bangalore",
-    destination: "Bangalore",
-    progress: 90
-  },
-  {
-    id: "S123459",
-    orderId: "O123459",
-    trackingNumber: "TRK123456792",
-    items: [
-      { name: "Red Chillies", quantity: 5 }
-    ],
-    status: "delivered" as const,
-    dispatchDate: new Date(2025, 3, 1),
-    estimatedDelivery: new Date(2025, 3, 5),
-    currentLocation: "Hyderabad",
-    destination: "Hyderabad",
-    progress: 100
-  }
-];
-
 const TraderShipments = () => {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("active");
+  const [shipments, setShipments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  useEffect(() => {
+    const fetchShipments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shipments')
+          .select(`
+            *,
+            order:orders(*),
+            items:shipment_items(*)
+          `)
+          .eq('trader_id', profile?.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Transform the data to match the expected format
+        const transformedShipments = data.map(shipment => ({
+          id: shipment.id,
+          orderId: shipment.order.id,
+          trackingNumber: shipment.tracking_number,
+          items: shipment.items.map(item => ({
+            name: item.product_name,
+            quantity: item.quantity
+          })),
+          status: shipment.status,
+          dispatchDate: new Date(shipment.dispatch_date),
+          estimatedDelivery: new Date(shipment.estimated_delivery),
+          currentLocation: shipment.current_location,
+          destination: shipment.destination,
+          progress: shipment.progress
+        }));
+
+        setShipments(transformedShipments);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (profile?.id) {
+      fetchShipments();
+    }
+  }, [profile?.id]);
   
   const getFilteredShipments = () => {
     return shipments.filter(shipment => {
@@ -99,6 +90,9 @@ const TraderShipments = () => {
   
   const filteredShipments = getFilteredShipments();
   
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
   return (
     <DashboardLayout userRole="trader">
       <DashboardHeader title="My Shipments" userName="Vikram Sharma" />

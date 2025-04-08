@@ -1,6 +1,7 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, addDays } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,74 +13,131 @@ import { Input } from "@/components/ui/input";
 import { Search, Calendar as CalendarIcon, Plus, Clock } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 
-const appointments = [
-  {
-    id: "APT001",
-    title: "Product Inspection",
-    with: "Rajesh Kumar (Farmer)",
-    date: addDays(new Date(), 2),
-    time: "10:00 AM - 11:00 AM",
-    location: "Farm Location, Amritsar",
-    status: "upcoming"
-  },
-  {
-    id: "APT002",
-    title: "Contract Discussion",
-    with: "Anand Singh (Farmer)",
-    date: addDays(new Date(), 4),
-    time: "2:00 PM - 3:30 PM",
-    location: "Virtual Meeting",
-    status: "upcoming"
-  },
-  {
-    id: "APT003",
-    title: "Product Sampling",
-    with: "Suresh Verma (Farmer)",
-    date: addDays(new Date(), 7),
-    time: "11:30 AM - 1:00 PM",
-    location: "Farm Location, Indore",
-    status: "upcoming"
-  },
-  {
-    id: "APT004",
-    title: "Quality Assessment",
-    with: "Meena Patel (Farmer)",
-    date: addDays(new Date(), -3),
-    time: "10:00 AM - 11:00 AM",
-    location: "Warehouse, Guntur",
-    status: "completed"
-  },
-  {
-    id: "APT005",
-    title: "Delivery Confirmation",
-    with: "Harpreet Singh (Farmer)",
-    date: addDays(new Date(), -7),
-    time: "3:00 PM - 4:00 PM",
-    location: "Virtual Meeting",
-    status: "completed"
-  }
-];
-
 const TraderAppointments = () => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const { profile } = useAuth();
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("upcoming");
-  
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            farmer:profiles(*)
+          `)
+          .eq('trader_id', profile?.id)
+          .order('appointment_date', { ascending: true });
+
+        if (error) throw error;
+
+        // Transform the data to match the expected format
+        const transformedAppointments = data.map(appointment => ({
+          id: appointment.id,
+          title: appointment.title,
+          with: `${appointment.farmer.name} (Farmer)`,
+          date: new Date(appointment.appointment_date),
+          time: appointment.appointment_time,
+          location: appointment.location,
+          status: appointment.status
+        }));
+
+        setAppointments(transformedAppointments);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (profile?.id) {
+      fetchAppointments();
+    }
+  }, [profile?.id]);
+
+  const handleCreateAppointment = async (appointmentData) => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .insert({
+          trader_id: profile?.id,
+          farmer_id: appointmentData.farmer_id,
+          title: appointmentData.title,
+          appointment_date: appointmentData.date,
+          appointment_time: appointmentData.time,
+          location: appointmentData.location,
+          status: 'upcoming'
+        });
+
+      if (error) throw error;
+
+      // Refresh appointments
+      const { data, error: fetchError } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          farmer:profiles(*)
+        `)
+        .eq('trader_id', profile?.id)
+        .order('appointment_date', { ascending: true });
+
+      if (fetchError) throw fetchError;
+
+      const transformedAppointments = data.map(appointment => ({
+        id: appointment.id,
+        title: appointment.title,
+        with: `${appointment.farmer.name} (Farmer)`,
+        date: new Date(appointment.appointment_date),
+        time: appointment.appointment_time,
+        location: appointment.location,
+        status: appointment.status
+      }));
+
+      setAppointments(transformedAppointments);
+    } catch (err) {
+      console.error('Error creating appointment:', err);
+    }
+  };
+
+  const handleUpdateAppointmentStatus = async (appointmentId, newStatus) => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: newStatus })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      // Update local state
+      setAppointments(appointments.map(appointment =>
+        appointment.id === appointmentId
+          ? { ...appointment, status: newStatus }
+          : appointment
+      ));
+    } catch (err) {
+      console.error('Error updating appointment status:', err);
+    }
+  };
+
   const filteredAppointments = appointments.filter(appointment => {
     const matchesSearch = 
       appointment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       appointment.with.toLowerCase().includes(searchTerm.toLowerCase()) ||
       appointment.location.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesTab = appointment.status === activeTab;
+    const matchesStatus = statusFilter === "all" || appointment.status === statusFilter;
     
-    const matchesDate = selectedDate 
-      ? appointment.date.toDateString() === selectedDate.toDateString()
-      : true;
-    
-    return matchesSearch && matchesTab && matchesDate;
+    return matchesSearch && matchesStatus;
   });
-  
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
   return (
     <DashboardLayout userRole="trader">
       <DashboardHeader title="Appointments" userName="Vikram Sharma" />
@@ -97,8 +155,9 @@ const TraderAppointments = () => {
             </Button>
           </CardHeader>
           <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
               <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="all">All</TabsTrigger>
                 <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
                 <TabsTrigger value="completed">Completed</TabsTrigger>
               </TabsList>
@@ -162,7 +221,7 @@ const TraderAppointments = () => {
                     </div>
                     <h3 className="text-lg font-medium mb-2">No appointments found</h3>
                     <p className="text-muted-foreground mb-6">
-                      {activeTab === "upcoming" 
+                      {statusFilter === "upcoming" 
                         ? "You don't have any upcoming appointments for the selected filters." 
                         : "You don't have any completed appointments matching your search."}
                     </p>

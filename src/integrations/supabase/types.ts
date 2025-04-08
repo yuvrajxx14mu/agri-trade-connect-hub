@@ -9,6 +9,130 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          message: string
+          type: string
+          is_read: boolean
+          related_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          message: string
+          type: string
+          is_read?: boolean
+          related_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          message?: string
+          type?: string
+          is_read?: boolean
+          related_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      notification_settings: {
+        Row: {
+          id: string
+          user_id: string
+          settings: {
+            email: {
+              bids: boolean
+              orders: boolean
+              shipments: boolean
+              pricingAlerts: boolean
+              appointments: boolean
+              promotions: boolean
+            }
+            push: {
+              bids: boolean
+              orders: boolean
+              shipments: boolean
+              pricingAlerts: boolean
+              appointments: boolean
+              promotions: boolean
+            }
+          }
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          settings: {
+            email: {
+              bids: boolean
+              orders: boolean
+              shipments: boolean
+              pricingAlerts: boolean
+              appointments: boolean
+              promotions: boolean
+            }
+            push: {
+              bids: boolean
+              orders: boolean
+              shipments: boolean
+              pricingAlerts: boolean
+              appointments: boolean
+              promotions: boolean
+            }
+          }
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          settings?: {
+            email: {
+              bids: boolean
+              orders: boolean
+              shipments: boolean
+              pricingAlerts: boolean
+              appointments: boolean
+              promotions: boolean
+            }
+            push: {
+              bids: boolean
+              orders: boolean
+              shipments: boolean
+              pricingAlerts: boolean
+              appointments: boolean
+              promotions: boolean
+            }
+          }
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       bids: {
         Row: {
           amount: number
@@ -50,7 +174,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       market_rates: {
@@ -154,7 +278,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       products: {
@@ -175,6 +299,7 @@ export type Database = {
           status: string
           unit: string
           updated_at: string
+          auction_id: string | null
         }
         Insert: {
           additional_images?: string[] | null
@@ -193,6 +318,7 @@ export type Database = {
           status?: string
           unit: string
           updated_at?: string
+          auction_id?: string | null
         }
         Update: {
           additional_images?: string[] | null
@@ -211,6 +337,7 @@ export type Database = {
           status?: string
           unit?: string
           updated_at?: string
+          auction_id?: string | null
         }
         Relationships: []
       }
@@ -258,6 +385,73 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      shipments: {
+        Row: {
+          id: string
+          order_id: string
+          farmer_id: string
+          trader_id: string
+          tracking_number: string
+          status: string
+          current_location: string | null
+          estimated_delivery: string | null
+          created_at: string
+          updated_at: string
+          dispatched_at: string | null
+          delivered_at: string | null
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          farmer_id: string
+          trader_id: string
+          tracking_number: string
+          status?: string
+          current_location?: string | null
+          estimated_delivery?: string | null
+          created_at?: string
+          updated_at?: string
+          dispatched_at?: string | null
+          delivered_at?: string | null
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          farmer_id?: string
+          trader_id?: string
+          tracking_number?: string
+          status?: string
+          current_location?: string | null
+          estimated_delivery?: string | null
+          created_at?: string
+          updated_at?: string
+          dispatched_at?: string | null
+          delivered_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_farmer_id_fkey"
+            columns: ["farmer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_trader_id_fkey"
+            columns: ["trader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {

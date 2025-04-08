@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +13,7 @@ import FarmerDashboard from "./pages/FarmerDashboard";
 import TraderDashboard from "./pages/TraderDashboard";
 import FarmerProducts from "./pages/FarmerProducts";
 import AuctionPage from "./pages/AuctionPage";
+import TraderOrderCreate from "./pages/TraderOrderCreate";
 
 // New Page imports
 import FarmerAuctions from "./pages/FarmerAuctions";
@@ -161,6 +161,11 @@ const App = () => (
             <Route path="/trader-market" element={
               <ProtectedRoute requiredRole="trader">
                 <TraderMarket />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-orders/create/:id" element={
+              <ProtectedRoute requiredRole="trader">
+                <TraderOrderCreate />
               </ProtectedRoute>
             } />
             <Route path="/trader-auctions" element={

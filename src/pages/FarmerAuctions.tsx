@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -10,73 +9,161 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Gavel, Plus, Search, ArrowUpRight, Calendar, Eye, Ban } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import { formatCurrency } from "@/lib/utils";
 
-const auctionData = [
-  { id: "A1", product: "Organic Wheat", quantity: "20 Quintals", startingPrice: "₹2,200/Quintal", currentBid: "₹2,450/Quintal", bidCount: 5, endsIn: "2 days", status: "active" },
-  { id: "A2", product: "Premium Rice", quantity: "15 Quintals", startingPrice: "₹3,500/Quintal", currentBid: "₹3,650/Quintal", bidCount: 3, endsIn: "6 hours", status: "active" },
-  { id: "A3", product: "Yellow Lentils", quantity: "10 Quintals", startingPrice: "₹9,000/Quintal", currentBid: "₹9,200/Quintal", bidCount: 2, endsIn: "1 day", status: "active" },
-  { id: "A4", product: "Red Chillies", quantity: "5 Quintals", startingPrice: "₹12,000/Quintal", currentBid: "₹12,000/Quintal", bidCount: 0, endsIn: "3 days", status: "active" },
-  { id: "A5", product: "Basmati Rice", quantity: "12 Quintals", startingPrice: "₹6,500/Quintal", currentBid: "₹7,200/Quintal", bidCount: 8, endsIn: "", status: "completed" },
-  { id: "A6", product: "Fresh Potatoes", quantity: "25 Quintals", startingPrice: "₹1,800/Quintal", currentBid: "₹2,100/Quintal", bidCount: 6, endsIn: "", status: "completed" },
-];
+interface Auction {
+  id: string;
+  product: {
+    name: string;
+    quantity: number;
+    unit: string;
+    price: number;
+  };
+  currentBid: number;
+  bidCount: number;
+  endsIn: string;
+  status: string;
+}
 
 const FarmerAuctions = () => {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  
-  const filteredAuctions = auctionData.filter(auction => {
-    const matchesSearch = auction.product.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || auction.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const [auctions, setAuctions] = useState<Auction[]>([]);
+
+  useEffect(() => {
+    const fetchAuctions = async () => {
+      if (!profile?.id) return;
+
+      try {
+        // Fetch products that are in auction by joining with auctions table
+        const { data: auctionProducts, error } = await supabase
+          .from('auctions')
+          .select(`
+            id,
+            product_id,
+            start_price,
+            current_price,
+            min_increment,
+            start_time,
+            end_time,
+            status,
+            products (
+              id,
+              name,
+              quantity,
+              unit,
+              price
+            )
+          `)
+          .eq('farmer_id', profile.id)
+          .eq('status', 'active');
+
+        if (error) throw error;
+
+        // Transform the data to match the expected format
+        const transformedAuctions = (auctionProducts || []).map(auction => ({
+          id: auction.product_id,
+          product: {
+            name: auction.products.name,
+            quantity: auction.products.quantity,
+            unit: auction.products.unit,
+            price: auction.products.price
+          },
+          currentBid: auction.current_price || auction.start_price,
+          bidCount: 0, // We'll need to fetch this separately if needed
+          endsIn: getTimeRemaining(new Date(auction.end_time)),
+          status: auction.status
+        }));
+
+        setAuctions(transformedAuctions);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching auctions:', error);
+        setIsLoading(false);
+      }
+    };
+
+    fetchAuctions();
+  }, [profile?.id]);
+
+  // Helper function to calculate time remaining
+  const getTimeRemaining = (endDate: Date) => {
+    const now = new Date();
+    const diff = endDate.getTime() - now.getTime();
+
+    if (diff <= 0) return 'Ended';
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+    if (days > 0) return `${days} days`;
+    return `${hours} hours`;
+  };
+
+  // Filter auctions based on search term and status
+  const filteredAuctions = auctions.filter(auction => {
+    const matchesSearch = auction.product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterStatus === "all" || auction.status === filterStatus;
+    return matchesSearch && matchesFilter;
   });
-  
+
+  if (isLoading) {
+    return (
+      <DashboardLayout userRole="farmer">
+        <DashboardHeader title="My Auctions" userName={profile?.name || ""} userRole="farmer" />
+        <div>Loading...</div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout userRole="farmer">
-      <DashboardHeader title="My Auctions" userName="Rajesh Kumar" />
+      <DashboardHeader title="My Auctions" userName={profile?.name || ""} userRole="farmer" />
       
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row justify-between sm:items-center">
-          <div>
-            <CardTitle>Auction Management</CardTitle>
-            <CardDescription>Create and manage your product auctions</CardDescription>
-          </div>
-          <Button 
-            onClick={() => navigate("/farmer-auctions/create")}
-            className="mt-4 sm:mt-0"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Create New Auction
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search auctions..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+      <div className="mb-6">
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <CardTitle>Active Auctions</CardTitle>
+                <CardDescription>Manage your ongoing product auctions</CardDescription>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search auctions..."
+                      className="pl-8"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="w-36">
+                      <SelectValue placeholder="Filter Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={() => navigate("/farmer-products")}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Auction
+                </Button>
+              </div>
             </div>
-            <div className="flex-shrink-0 w-full md:w-40">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <div className="rounded-md border">
+          </CardHeader>
+          <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -85,75 +172,69 @@ const FarmerAuctions = () => {
                   <TableHead>Starting Price</TableHead>
                   <TableHead>Current Bid</TableHead>
                   <TableHead>Bids</TableHead>
+                  <TableHead>Time Left</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAuctions.length > 0 ? (
-                  filteredAuctions.map((auction) => (
-                    <TableRow key={auction.id}>
-                      <TableCell className="font-medium">{auction.product}</TableCell>
-                      <TableCell>{auction.quantity}</TableCell>
-                      <TableCell>{auction.startingPrice}</TableCell>
-                      <TableCell className="font-medium">{auction.currentBid}</TableCell>
-                      <TableCell>{auction.bidCount}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant="outline" 
-                          className={
-                            auction.status === "completed" 
-                              ? "bg-green-50 text-green-700 border-green-200" 
-                              : "bg-blue-50 text-blue-700 border-blue-200"
-                          }
+                {filteredAuctions.map((auction) => (
+                  <TableRow key={auction.id}>
+                    <TableCell className="font-medium">{auction.product.name}</TableCell>
+                    <TableCell>{auction.product.quantity} {auction.product.unit}</TableCell>
+                    <TableCell>{formatCurrency(auction.product.price)}</TableCell>
+                    <TableCell>{formatCurrency(auction.currentBid)}</TableCell>
+                    <TableCell>{auction.bidCount}</TableCell>
+                    <TableCell>{auction.endsIn}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant="outline" 
+                        className={
+                          auction.status === "completed"
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : auction.status === "cancelled"
+                            ? "bg-red-50 text-red-700 border-red-200"
+                            : "bg-blue-50 text-blue-700 border-blue-200"
+                        }
+                      >
+                        {auction.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => navigate(`/farmer-auctions/${auction.id}`)}
                         >
-                          {auction.status === "active" ? (
-                            <div className="flex items-center">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              <span>{auction.endsIn}</span>
-                            </div>
-                          ) : (
-                            "Completed"
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => navigate(`/farmer-auctions/${auction.id}`)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {auction.status === "active" && (
-                            <>
-                              <Button variant="ghost" size="icon" onClick={() => navigate(`/farmer-auctions/${auction.id}/edit`)}>
-                                <ArrowUpRight className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="text-destructive">
-                                <Ban className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center h-24">
-                      <div className="flex flex-col items-center justify-center">
-                        <Gavel className="h-8 w-8 text-muted-foreground mb-2" />
-                        <p className="text-muted-foreground mb-2">No auctions found matching your criteria</p>
-                        <Button onClick={() => navigate("/farmer-auctions/create")}>
-                          Create New Auction
+                          <Eye className="h-4 w-4" />
                         </Button>
+                        {auction.status === "active" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-600"
+                            onClick={() => {/* Handle cancel auction */}}
+                          >
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredAuctions.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      No auctions found
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </DashboardLayout>
   );
 };
