@@ -10,17 +10,17 @@ import { Input } from "@/components/ui/input";
 import { Search, ShoppingCart } from "lucide-react";
 import OrderCard from "@/components/OrderCard";
 
-// Sample data for orders
+// Sample data for orders with corrected types
 const orders = [
   {
     id: "ORD123456",
     date: new Date(2025, 3, 5),
     customer: { name: "Vikram Sharma", avatar: "", initials: "VS" },
     products: [
-      { name: "Organic Wheat", quantity: 20, price: "₹2,200/Quintal" }
+      { name: "Organic Wheat", quantity: "20", price: "₹2,200/Quintal" }
     ],
     totalAmount: "₹44,000",
-    status: "confirmed",
+    status: "confirmed" as "confirmed" | "pending" | "shipped" | "delivered" | "cancelled",
     paymentStatus: "paid"
   },
   {
@@ -28,10 +28,10 @@ const orders = [
     date: new Date(2025, 3, 3),
     customer: { name: "Rahul Mehta", avatar: "", initials: "RM" },
     products: [
-      { name: "Premium Rice", quantity: 15, price: "₹3,500/Quintal" }
+      { name: "Premium Rice", quantity: "15", price: "₹3,500/Quintal" }
     ],
     totalAmount: "₹52,500",
-    status: "processing",
+    status: "processing" as "confirmed" | "pending" | "shipped" | "delivered" | "cancelled",
     paymentStatus: "pending"
   },
   {
@@ -39,10 +39,10 @@ const orders = [
     date: new Date(2025, 3, 1),
     customer: { name: "Anjali Patel", avatar: "", initials: "AP" },
     products: [
-      { name: "Yellow Lentils", quantity: 10, price: "₹9,000/Quintal" }
+      { name: "Yellow Lentils", quantity: "10", price: "₹9,000/Quintal" }
     ],
     totalAmount: "₹90,000",
-    status: "shipped",
+    status: "shipped" as "confirmed" | "pending" | "shipped" | "delivered" | "cancelled",
     paymentStatus: "paid"
   },
   {
@@ -50,10 +50,10 @@ const orders = [
     date: new Date(2025, 2, 28),
     customer: { name: "Deepak Kumar", avatar: "", initials: "DK" },
     products: [
-      { name: "Red Chillies", quantity: 5, price: "₹12,000/Quintal" }
+      { name: "Red Chillies", quantity: "5", price: "₹12,000/Quintal" }
     ],
     totalAmount: "₹60,000",
-    status: "delivered",
+    status: "delivered" as "confirmed" | "pending" | "shipped" | "delivered" | "cancelled",
     paymentStatus: "paid"
   },
   {
@@ -61,10 +61,10 @@ const orders = [
     date: new Date(2025, 2, 25),
     customer: { name: "Priya Singh", avatar: "", initials: "PS" },
     products: [
-      { name: "Basmati Rice", quantity: 12, price: "₹6,500/Quintal" }
+      { name: "Basmati Rice", quantity: "12", price: "₹6,500/Quintal" }
     ],
     totalAmount: "₹78,000",
-    status: "completed",
+    status: "completed" as "confirmed" | "pending" | "shipped" | "delivered" | "cancelled",
     paymentStatus: "paid"
   }
 ];
