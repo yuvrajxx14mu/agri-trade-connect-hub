@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Truck, PlusCircle, Loader2 } from "lucide-react";
 import ShipmentCard from "@/components/ShipmentCard";
 import { useToast } from "@/components/ui/use-toast";
-import { Database } from '../integrations/supabase/types";
+import { Database } from "../integrations/supabase/types";
 
 type ShipmentStatus = 
   | "processing" 
