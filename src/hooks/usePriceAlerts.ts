@@ -27,26 +27,16 @@ export const usePriceAlerts = () => {
     try {
       setLoading(true);
       
-      // Use direct SQL query via RPC if complex query needed
+      // Direct query since we defined the table in previous SQL
       const { data, error: fetchError } = await supabase
-        .rpc('get_user_price_alerts', { user_id: profile.id })
+        .from('price_alerts')
+        .select('*')
+        .eq('user_id', profile.id)
         .order('created_at', { ascending: false });
       
-      if (fetchError) {
-        // Fallback to standard query
-        const { data: standardData, error: standardError } = await supabase
-          .from('price_alerts')
-          .select('*')
-          .eq('user_id', profile.id)
-          .order('created_at', { ascending: false });
-        
-        if (standardError) throw standardError;
-        
-        setAlerts(standardData as PriceAlert[]);
-      } else {
-        setAlerts(data as PriceAlert[]);
-      }
+      if (fetchError) throw fetchError;
       
+      setAlerts(data as PriceAlert[]);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching price alerts:', err);

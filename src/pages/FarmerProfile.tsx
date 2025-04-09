@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -16,7 +15,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { User, MapPin, Phone, Mail, Shield, Bell, Key, Upload, Calendar } from "lucide-react";
 
-// Define interfaces for notification settings
 interface NotificationSettings {
   email: {
     orders: boolean;
@@ -73,8 +71,25 @@ const FarmerProfile = () => {
       promotions: false
     }
   });
-  
-  // Fetch notification settings
+  const [userSettings, setUserSettings] = useState<NotificationSettings>({
+    email: {
+      orders: true,
+      shipments: true,
+      bids: true,
+      appointments: true,
+      pricingAlerts: true,
+      promotions: false
+    },
+    push: {
+      orders: true,
+      shipments: true,
+      bids: true,
+      appointments: true,
+      pricingAlerts: true,
+      promotions: false
+    }
+  });
+
   useEffect(() => {
     const fetchNotificationSettings = async () => {
       if (!profile?.id) return;
@@ -87,7 +102,6 @@ const FarmerProfile = () => {
           .single();
         
         if (error) {
-          // If no settings exist, create default ones
           if (error.code === 'PGRST116') {
             const { error: insertError } = await supabase
               .from('notification_settings')
@@ -111,7 +125,6 @@ const FarmerProfile = () => {
     fetchNotificationSettings();
   }, [profile?.id]);
   
-  // Initialize form data when profile is loaded
   useEffect(() => {
     if (profile) {
       const nameParts = profile.name.split(' ');
@@ -126,7 +139,6 @@ const FarmerProfile = () => {
         address: profile.address || ""
       });
       
-      // If farm details exist in profile, initialize farm form
       const farmDetails = profile.farm_details;
       if (farmDetails) {
         setFarmInfo({
@@ -146,7 +158,6 @@ const FarmerProfile = () => {
     setLoading(true);
     
     try {
-      // Construct full name
       const fullName = `${personalInfo.firstName} ${personalInfo.lastName}`.trim();
       
       const { error } = await updateProfile({
@@ -174,42 +185,30 @@ const FarmerProfile = () => {
     }
   };
   
-  const handleUpdateFarmInfo = async () => {
-    if (!profile) return;
-    
-    setLoading(true);
-    
+  const handleUpdateFarm = async (farmData) => {
     try {
-      // Construct farm details object
-      const farmDetails = {
-        farm_name: farmInfo.farmName,
-        farm_size: parseFloat(farmInfo.farmSize) || 0,
-        primary_crops: farmInfo.primaryCrops,
-        description: farmInfo.farmDescription,
-        certifications: farmInfo.certifications
+      const updates = {
+        farm_details: farmData
       };
       
-      // Update profile with farm details
-      const { error } = await updateProfile({
-        farm_details: farmDetails
-      });
+      const { error } = await updateProfile(updates);
       
       if (error) throw error;
       
       toast({
         title: "Success",
-        description: "Farm information updated successfully",
+        description: "Farm details updated successfully",
         variant: "default"
       });
+      
+      setIsEditingFarm(false);
     } catch (err) {
-      console.error('Error updating farm info:', err);
+      console.error('Error updating farm details:', err);
       toast({
         title: "Error",
-        description: "Failed to update farm information",
+        description: "Failed to update farm details",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
   };
   
@@ -217,7 +216,6 @@ const FarmerProfile = () => {
     if (!profile?.id) return;
     
     try {
-      // Update local state
       const updatedSettings = {
         ...notificationSettings,
         [type]: {
@@ -228,7 +226,6 @@ const FarmerProfile = () => {
       
       setNotificationSettings(updatedSettings);
       
-      // Update in database
       const { error } = await supabase
         .from('notification_settings')
         .update({
@@ -242,6 +239,33 @@ const FarmerProfile = () => {
       toast({
         title: "Error",
         description: "Failed to update notification settings",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const handleSaveNotificationSettings = async (settings) => {
+    try {
+      const { error } = await supabase
+        .from('notification_settings')
+        .upsert({
+          user_id: profile.id,
+          settings: JSON.stringify(settings)
+        });
+      
+      if (error) throw error;
+      
+      setUserSettings(settings);
+      toast({
+        title: "Settings Saved",
+        description: "Notification preferences have been updated.",
+        variant: "default"
+      });
+    } catch (err) {
+      console.error('Error updating notification settings:', err);
+      toast({
+        title: "Error",
+        description: "Failed to save notification settings.",
         variant: "destructive"
       });
     }
@@ -394,7 +418,7 @@ const FarmerProfile = () => {
                   <CardDescription>Information about your agricultural operations</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleUpdateFarmInfo(); }}>
+                  <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleUpdateFarm(farmInfo); }}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="farmName">Farm Name</Label>
@@ -486,7 +510,6 @@ const FarmerProfile = () => {
                               email: updatedEmail
                             }));
                             
-                            // Update in database
                             if (profile?.id) {
                               supabase
                                 .from('notification_settings')

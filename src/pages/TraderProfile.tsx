@@ -11,13 +11,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { User, MapPin, Phone, Mail, Shield, Bell, Key, Upload, Calendar, Building2 } from "lucide-react";
+import { useAuth } from "@/context/auth";
 
 const TraderProfile = () => {
+  const { profile: userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   
   return (
     <DashboardLayout userRole="trader">
-      <DashboardHeader title="My Profile" userName={profile?.name || "User"} userRole="trader" />
+      <DashboardHeader title="My Profile" userName={userProfile?.name || "User"} userRole="trader" />
       
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <Card className="lg:col-span-1">

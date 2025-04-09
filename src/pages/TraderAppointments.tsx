@@ -1,259 +1,316 @@
 import { useState, useEffect } from "react";
-import { format, addDays } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Calendar as CalendarIcon, Plus, Clock } from "lucide-react";
-import { DatePicker } from "@/components/ui/date-picker";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Calendar } from "lucide-react";
+import { CalendarDate } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Database } from '../integrations/supabase/types';
+
+type Appointment = Database['public']['Tables']['appointments']['Row'] & {
+  farmer: {
+    id: string;
+    name: string;
+    phone: string;
+    address: string;
+    city: string;
+    state: string;
+  }
+};
 
 const TraderAppointments = () => {
+  const navigate = useNavigate();
   const { profile } = useAuth();
-  const [appointments, setAppointments] = useState([]);
+  const { toast } = useToast();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [error, setError] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newAppointment, setNewAppointment] = useState({
+    title: '',
+    farmerId: '',
+    date: '',
+    time: '',
+    location: ''
+  });
+  const [date, setDate] = useState<Date | undefined>(new Date());
 
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('appointments')
-          .select(`
-            *,
-            farmer:profiles(*)
-          `)
-          .eq('trader_id', profile?.id)
-          .order('appointment_date', { ascending: true });
-
-        if (error) throw error;
-
-        // Transform the data to match the expected format
-        const transformedAppointments = data.map(appointment => ({
-          id: appointment.id,
-          title: appointment.title,
-          with: `${appointment.farmer.name} (Farmer)`,
-          date: new Date(appointment.appointment_date),
-          time: appointment.appointment_time,
-          location: appointment.location,
-          status: appointment.status
-        }));
-
-        setAppointments(transformedAppointments);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (profile?.id) {
-      fetchAppointments();
-    }
-  }, [profile?.id]);
-
-  const handleCreateAppointment = async (appointmentData) => {
+  const fetchAppointments = async () => {
+    if (!profile?.id) return;
+    
     try {
-      const { error } = await supabase
-        .from('appointments')
-        .insert({
-          trader_id: profile?.id,
-          farmer_id: appointmentData.farmer_id,
-          title: appointmentData.title,
-          appointment_date: appointmentData.date,
-          appointment_time: appointmentData.time,
-          location: appointmentData.location,
-          status: 'upcoming'
-        });
-
-      if (error) throw error;
-
-      // Refresh appointments
-      const { data, error: fetchError } = await supabase
+      setLoading(true);
+      
+      const { data, error } = await supabase
         .from('appointments')
         .select(`
           *,
-          farmer:profiles(*)
+          farmer:profiles!appointments_farmer_id_fkey(id, name, phone, address, city, state)
         `)
-        .eq('trader_id', profile?.id)
-        .order('appointment_date', { ascending: true });
+        .eq('trader_id', profile.id);
+      
+      if (error) throw error;
+      
+      setAppointments(data || []);
+      setFilteredAppointments(data || []);
+    } catch (err) {
+      console.error('Error fetching appointments:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to load appointments',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      if (fetchError) throw fetchError;
+  useEffect(() => {
+    fetchAppointments();
+  }, [profile?.id]);
 
-      const transformedAppointments = data.map(appointment => ({
-        id: appointment.id,
-        title: appointment.title,
-        with: `${appointment.farmer.name} (Farmer)`,
-        date: new Date(appointment.appointment_date),
-        time: appointment.appointment_time,
-        location: appointment.location,
-        status: appointment.status
-      }));
+  const handleSearch = (e) => {
+    const searchTerm = e.target.value.toLowerCase();
+    const filtered = appointments.filter(appointment =>
+      appointment.title.toLowerCase().includes(searchTerm) ||
+      appointment.farmer.name.toLowerCase().includes(searchTerm)
+    );
+    setFilteredAppointments(filtered);
+  };
 
-      setAppointments(transformedAppointments);
+  const openCreateModal = () => {
+    setIsCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    setIsCreateModalOpen(false);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewAppointment(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const createAppointment = async (formData) => {
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .insert({
+          title: formData.title,
+          farmer_id: formData.farmerId,
+          trader_id: profile.id,
+          appointment_date: formData.date,
+          appointment_time: formData.time,
+          location: formData.location,
+          status: 'scheduled'
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      fetchAppointments();
+      closeCreateModal();
+      toast({
+        title: 'Appointment Created',
+        description: 'New appointment has been scheduled.',
+        variant: 'default',
+      });
     } catch (err) {
       console.error('Error creating appointment:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to create appointment',
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleUpdateAppointmentStatus = async (appointmentId, newStatus) => {
-    try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status: newStatus })
-        .eq('id', appointmentId);
-
-      if (error) throw error;
-
-      // Update local state
-      setAppointments(appointments.map(appointment =>
-        appointment.id === appointmentId
-          ? { ...appointment, status: newStatus }
-          : appointment
-      ));
-    } catch (err) {
-      console.error('Error updating appointment status:', err);
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await createAppointment(newAppointment);
   };
 
-  const filteredAppointments = appointments.filter(appointment => {
-    const matchesSearch = 
-      appointment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.with.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.location.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || appointment.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
+  if (loading) {
+    return <div>Loading appointments...</div>;
+  }
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
 
   return (
     <DashboardLayout userRole="trader">
-      <DashboardHeader title="Appointments" userName={profile?.name || "User"} userRole="trader" />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-col sm:flex-row justify-between sm:items-center">
-            <div>
-              <CardTitle>My Appointments</CardTitle>
-              <CardDescription>Manage meetings with farmers and suppliers</CardDescription>
-            </div>
-            <Button className="mt-4 sm:mt-0 bg-agri-trader">
-              <Plus className="mr-2 h-4 w-4" />
-              Schedule New
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-              </TabsList>
-              
-              <div className="mb-6">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Search appointments..."
-                    className="pl-8"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
+      <DashboardHeader title="My Appointments" userName={profile?.name || "Trader"} />
+
+      <Card>
+        <CardHeader className="flex flex-col sm:flex-row justify-between sm:items-center">
+          <div>
+            <CardTitle>Appointment List</CardTitle>
+            <CardDescription>Manage your scheduled appointments</CardDescription>
+          </div>
+          <Button onClick={openCreateModal}>
+            Schedule Appointment
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <Input
+            type="search"
+            placeholder="Search appointments..."
+            onChange={handleSearch}
+            className="mb-4"
+          />
+
+          <Table>
+            <TableCaption>A list of your scheduled appointments.</TableCaption>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Farmer</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredAppointments.map((appointment) => (
+                <TableRow key={appointment.id}>
+                  <TableCell>{appointment.title}</TableCell>
+                  <TableCell>{appointment.farmer.name}</TableCell>
+                  <TableCell>{appointment.appointment_date}</TableCell>
+                  <TableCell>{appointment.appointment_time}</TableCell>
+                  <TableCell>{appointment.location}</TableCell>
+                  <TableCell>{appointment.status}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Create Appointment Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white p-8 rounded-md shadow-lg w-full max-w-md">
+            <h2 className="text-2xl font-semibold mb-4">Schedule New Appointment</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  type="text"
+                  id="title"
+                  name="title"
+                  placeholder="Appointment Title"
+                  value={newAppointment.title}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full"
+                />
               </div>
-              
-              <div className="space-y-4">
-                {filteredAppointments.length > 0 ? (
-                  filteredAppointments.map((appointment) => (
-                    <Card key={appointment.id} className="overflow-hidden">
-                      <CardContent className="p-0">
-                        <div className="flex flex-col sm:flex-row">
-                          <div className="bg-agri-trader p-4 sm:p-6 text-primary-foreground sm:w-32 flex flex-row sm:flex-col justify-between sm:justify-center items-center sm:items-start">
-                            <div className="text-xl sm:text-2xl font-bold">
-                              {format(appointment.date, "dd")}
-                            </div>
-                            <div className="text-sm">
-                              {format(appointment.date, "MMM yyyy")}
-                            </div>
-                          </div>
-                          <div className="p-4 sm:p-6 flex-1">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2">
-                              <h3 className="font-semibold text-lg">{appointment.title}</h3>
-                              <Badge variant="outline" className={appointment.status === "upcoming" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-green-50 text-green-700 border-green-200"}>
-                                {appointment.status === "upcoming" ? "Upcoming" : "Completed"}
-                              </Badge>
-                            </div>
-                            <div className="text-sm text-muted-foreground mb-2">
-                              With: {appointment.with}
-                            </div>
-                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 text-sm">
-                              <div className="flex items-center">
-                                <Clock className="h-4 w-4 mr-1 text-muted-foreground" />
-                                <span>{appointment.time}</span>
-                              </div>
-                              <div className="flex items-center">
-                                <CalendarIcon className="h-4 w-4 mr-1 text-muted-foreground" />
-                                <span>{appointment.location}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                      <CalendarIcon className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-medium mb-2">No appointments found</h3>
-                    <p className="text-muted-foreground mb-6">
-                      {statusFilter === "upcoming" 
-                        ? "You don't have any upcoming appointments for the selected filters." 
-                        : "You don't have any completed appointments matching your search."}
-                    </p>
-                    <Button className="bg-agri-trader">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Schedule New Appointment
+              <div>
+                <Label htmlFor="farmerId">Farmer ID</Label>
+                <Input
+                  type="text"
+                  id="farmerId"
+                  name="farmerId"
+                  placeholder="Farmer ID"
+                  value={newAppointment.farmerId}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <Label>Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !date && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {date ? format(date, "PPP") : <span>Pick a date</span>}
                     </Button>
-                  </div>
-                )}
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarDate
+                      mode="single"
+                      selected={date}
+                      onSelect={setDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
-            </Tabs>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Calendar</CardTitle>
-            <CardDescription>Select date to filter appointments</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <DatePicker date={selectedDate} setDate={setSelectedDate} />
-            <div className="pt-4">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                className="rounded-md border w-full"
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <div>
+                <Label htmlFor="date">Date</Label>
+                <Input
+                  type="text"
+                  id="date"
+                  name="date"
+                  placeholder="Date"
+                  value={newAppointment.date}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <Label htmlFor="time">Time</Label>
+                <Input
+                  type="time"
+                  id="time"
+                  name="time"
+                  placeholder="Time"
+                  value={newAppointment.time}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  type="text"
+                  id="location"
+                  name="location"
+                  placeholder="Location"
+                  value={newAppointment.location}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full"
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="ghost" onClick={closeCreateModal}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Schedule
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 };

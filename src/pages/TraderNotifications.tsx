@@ -14,7 +14,7 @@ const TraderNotifications = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("all");
-  const [notificationsList, setNotificationsList] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
@@ -30,7 +30,7 @@ const TraderNotifications = () => {
           
         if (error) throw error;
         
-        setNotificationsList(data || []);
+        setNotifications(data || []);
       } catch (error) {
         console.error('Error fetching notifications:', error);
         toast({
@@ -46,11 +46,30 @@ const TraderNotifications = () => {
     fetchNotifications();
   }, [profile?.id, toast]);
   
-  const filteredNotifications = notificationsList.filter(notification => {
+  const filteredNotifications = notifications.filter(notification => {
     if (activeTab === "all") return true;
     if (activeTab === "unread") return !notification.is_read;
     return notification.type === activeTab;
   });
+  
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', notificationId);
+
+      if (error) throw error;
+
+      setNotifications(notifications.map(notification =>
+        notification.id === notificationId
+          ? { ...notification, read: true }
+          : notification
+      ));
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
   
   const markAllAsRead = async () => {
     if (!profile?.id) return;
@@ -58,15 +77,15 @@ const TraderNotifications = () => {
     try {
       const { error } = await supabase
         .from('notifications')
-        .update({ is_read: true })
+        .update({ read: true })
         .eq('user_id', profile.id)
-        .eq('is_read', false);
+        .eq('read', false);
         
       if (error) throw error;
       
-      setNotificationsList(notificationsList.map(notification => ({
+      setNotifications(notifications.map(notification => ({
         ...notification,
-        is_read: true
+        read: true
       })));
       
       toast({
@@ -87,13 +106,13 @@ const TraderNotifications = () => {
     try {
       const { error } = await supabase
         .from('notifications')
-        .update({ is_read: true })
+        .update({ read: true })
         .eq('id', id);
         
       if (error) throw error;
       
-      setNotificationsList(notificationsList.map(notification => 
-        notification.id === id ? { ...notification, is_read: true } : notification
+      setNotifications(notifications.map(notification => 
+        notification.id === id ? { ...notification, read: true } : notification
       ));
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -116,7 +135,7 @@ const TraderNotifications = () => {
         
       if (error) throw error;
       
-      setNotificationsList([]);
+      setNotifications([]);
       toast({
         title: "Success",
         description: "All notifications cleared"
@@ -131,7 +150,7 @@ const TraderNotifications = () => {
     }
   };
   
-  const unreadCount = notificationsList.filter(n => !n.is_read).length;
+  const unreadCount = notifications.filter(n => !n.is_read).length;
   
   return (
     <DashboardLayout userRole="trader">
@@ -156,7 +175,7 @@ const TraderNotifications = () => {
               <CheckSquare className="h-4 w-4 mr-2" />
               Mark All Read
             </Button>
-            <Button variant="outline" size="sm" onClick={clearAllNotifications} disabled={notificationsList.length === 0}>
+            <Button variant="outline" size="sm" onClick={clearAllNotifications} disabled={notifications.length === 0}>
               <Trash2 className="h-4 w-4 mr-2" />
               Clear All
             </Button>
@@ -189,7 +208,7 @@ const TraderNotifications = () => {
                     time={new Date(notification.created_at)}
                     type={notification.type}
                     read={notification.is_read}
-                    onClick={() => markAsRead(notification.id)}
+                    onClick={() => handleMarkAsRead(notification.id)}
                   />
                 ))
               ) : (

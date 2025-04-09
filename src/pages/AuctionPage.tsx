@@ -96,7 +96,7 @@ const AuctionPage = () => {
           .from('auctions')
           .select(`
             *,
-            farmer_profile:profiles!inner(
+            farmer_profile:profiles!auctions_farmer_id_fkey(
               id,
               name,
               phone,
@@ -112,13 +112,11 @@ const AuctionPage = () => {
         if (auctionError) throw auctionError;
 
         if (auctionData) {
-          const typedAuctionData = auctionData as SupabaseAuctionResponse;
-          
           // Then fetch the bids separately
           const { data: bidsData, error: bidsError } = await supabase
             .from('bids')
             .select('id, bidder_id, amount, created_at')
-            .eq('product_id', typedAuctionData.product_id)
+            .eq('product_id', auctionData.product_id)
             .order('amount', { ascending: false });
 
           if (bidsError) {
@@ -127,7 +125,7 @@ const AuctionPage = () => {
 
           // Transform the data to match our interface
           const transformedAuction: Auction = {
-            ...typedAuctionData,
+            ...auctionData as unknown as SupabaseAuctionResponse,
             bids: (bidsData || []) as Bid[]
           };
           

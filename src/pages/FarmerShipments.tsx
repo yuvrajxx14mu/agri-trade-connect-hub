@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Truck, PlusCircle, Loader2 } from "lucide-react";
 import ShipmentCard from "@/components/ShipmentCard";
 import { useToast } from "@/components/ui/use-toast";
-import { Database } from '../integrations/supabase/types';
+import { Database } from '../integrations/supabase/types";
 
 type ShipmentStatus = 
   | "processing" 
@@ -133,10 +133,10 @@ const FarmerShipments = () => {
       trackingNumber: shipment.tracking_number,
       items: [], // We'll need to fetch order details to get the items
       status: shipment.status as ShipmentStatus,
-      dispatchDate: shipment.dispatched_at ? new Date(shipment.dispatched_at) : null,
+      dispatchDate: shipment.dispatch_date ? new Date(shipment.dispatch_date) : null,
       estimatedDelivery: shipment.estimated_delivery ? new Date(shipment.estimated_delivery) : null,
       currentLocation: shipment.current_location,
-      destination: "Trader's Warehouse", // This should come from the order details
+      destination: shipment.destination || "Trader's Warehouse",
       progress: getShipmentProgress(shipment.status),
       onClick: () => handleShipmentClick(shipment.id)
     };

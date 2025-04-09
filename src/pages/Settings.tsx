@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -18,7 +17,9 @@ const Settings = () => {
   const { profile } = useAuth();
   const [saving, setSaving] = useState(false);
 
-  const userRole = profile?.role || "farmer";
+  // Fix the userRole type by casting it to the required type
+  const userPath = location.pathname.includes('farmer') ? 'farmer' : 'trader';
+  const userRole = userPath as "farmer" | "trader";
 
   const handleSave = () => {
     setSaving(true);

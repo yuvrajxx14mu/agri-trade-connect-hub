@@ -52,9 +52,8 @@ const OrderDetail = () => {
   const [shipment, setShipment] = useState<any>(null);
   const [otherParty, setOtherParty] = useState<any>(null);
   
-  const userRole = profile?.role === "farmer" || profile?.role === "trader" 
-    ? profile.role 
-    : "farmer" as const;
+  const userPath = location.pathname.includes('farmer') ? 'farmer' : 'trader';
+  const userRole = userPath as "farmer" | "trader";
 
   useEffect(() => {
     const fetchOrderDetails = async () => {

@@ -82,10 +82,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // If the profile has email property, assign it
-      const profileWithEmail = {
-        ...data,
-        email: user?.email || ''
+      // Ensure profile has the correct structure
+      const profileWithEmail: ProfileData = {
+        id: data.id,
+        name: data.name,
+        role: data.role,
+        phone: data.phone || '',
+        email: user?.email || '',
+        address: data.address || '',
+        city: data.city || '',
+        state: data.state || '',
+        pincode: data.pincode || '',
+        farm_details: data.farm_details || null,
+        created_at: data.created_at,
+        updated_at: data.updated_at
       };
 
       setProfile(profileWithEmail);

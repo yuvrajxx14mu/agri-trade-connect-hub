@@ -39,7 +39,7 @@ export const useNotifications = () => {
       // Ensure all notifications have the read property
       const notificationsWithRead = data?.map(notification => ({
         ...notification,
-        read: notification.read !== undefined ? notification.read : notification.is_read || false
+        read: notification.read !== undefined ? notification.read : false
       })) || [];
       
       setNotifications(notificationsWithRead as Notification[]);

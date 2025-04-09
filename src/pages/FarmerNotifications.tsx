@@ -62,7 +62,7 @@ const FarmerNotifications = () => {
           title: notification.title,
           message: notification.message,
           time: new Date(notification.created_at),
-          read: notification.is_read
+          read: notification.read || false
         }));
 
         setNotifications(transformedNotifications);
@@ -126,7 +126,14 @@ const FarmerNotifications = () => {
         return;
       }
 
-      setSettings(data.settings);
+      if (data && data.settings) {
+        // Parse JSON if needed
+        const parsedSettings = typeof data.settings === 'string' 
+          ? JSON.parse(data.settings) 
+          : data.settings;
+          
+        setSettings(parsedSettings);
+      }
     } catch (err) {
       console.error('Error fetching notification settings:', err);
     }
@@ -142,7 +149,7 @@ const FarmerNotifications = () => {
     try {
       const { error } = await supabase
         .from('notifications')
-        .update({ is_read: true })
+        .update({ read: true })
         .eq('id', notificationId);
 
       if (error) throw error;
