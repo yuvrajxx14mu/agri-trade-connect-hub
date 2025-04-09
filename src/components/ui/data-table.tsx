@@ -67,9 +67,9 @@ export function DataTable({
         {searchKey && (
           <Input
             placeholder={searchPlaceholder}
-            value={table.getColumn(searchKey)?.getFilterValue() ?? ""}
+            value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
             onChange={(event) =>
-              table.getColumn(searchKey)?.setFilterValue(event.target.value)
+              table.getColumn(searchKey)?.setFilterValue(event.target.value as string)
             }
             className="max-w-sm"
           />
