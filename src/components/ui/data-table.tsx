@@ -1,55 +1,23 @@
 
-import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  getPaginationRowModel,
-  SortingState,
-  getSortedRowModel,
-  ColumnFiltersState,
-  getFilteredRowModel,
-} from "@tanstack/react-table";
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { flexRender, getCoreRowModel, useReactTable, getPaginationRowModel, getSortedRowModel, getFilteredRowModel } from "@tanstack/react-table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 
-interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[];
-  data: TData[];
-  searchKey?: string;
-  searchPlaceholder?: string;
-  showPagination?: boolean;
-  pageCount?: number;
-  filterOptions?: {
-    key: string;
-    label: string;
-    options: { label: string; value: string }[];
-  };
-}
-
-export function DataTable<TData, TValue>({
-  columns,
-  data,
-  searchKey,
+export function DataTable({ 
+  columns, 
+  data, 
+  searchKey, 
   searchPlaceholder = "Search...",
   showPagination = true,
   pageCount,
   filterOptions
-}: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [filterValue, setFilterValue] = useState<string>("all");
+}) {
+  const [sorting, setSorting] = useState([]);
+  const [columnFilters, setColumnFilters] = useState([]);
+  const [filterValue, setFilterValue] = useState("all");
 
   const table = useReactTable({
     data,
@@ -66,7 +34,7 @@ export function DataTable<TData, TValue>({
     },
   });
 
-  const handleFilterChange = (value: string) => {
+  const handleFilterChange = (value) => {
     setFilterValue(value);
     if (filterOptions?.key) {
       if (value === "all") {
@@ -83,14 +51,14 @@ export function DataTable<TData, TValue>({
         {searchKey && (
           <Input
             placeholder={searchPlaceholder}
-            value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
+            value={table.getColumn(searchKey)?.getFilterValue() ?? ""}
             onChange={(event) =>
               table.getColumn(searchKey)?.setFilterValue(event.target.value)
             }
             className="max-w-sm"
           />
         )}
-
+        
         {filterOptions && (
           <div className="flex-shrink-0">
             <Select value={filterValue} onValueChange={handleFilterChange}>
@@ -109,6 +77,7 @@ export function DataTable<TData, TValue>({
           </div>
         )}
       </div>
+      
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -129,6 +98,7 @@ export function DataTable<TData, TValue>({
               </TableRow>
             ))}
           </TableHeader>
+          
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
@@ -159,6 +129,7 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
+      
       {showPagination && (
         <div className="flex items-center justify-end space-x-2 py-4">
           <Button

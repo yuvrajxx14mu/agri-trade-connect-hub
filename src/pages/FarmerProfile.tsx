@@ -1,635 +1,723 @@
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { User, MapPin, Phone, Mail, Shield, Bell, Key, Upload, Calendar } from "lucide-react";
-
-interface NotificationSettings {
-  email: {
-    orders: boolean;
-    shipments: boolean;
-    bids: boolean;
-    appointments: boolean;
-    pricingAlerts: boolean;
-    promotions: boolean;
-  };
-  push: {
-    orders: boolean;
-    shipments: boolean;
-    bids: boolean;
-    appointments: boolean;
-    pricingAlerts: boolean;
-    promotions: boolean;
-  };
-}
+import { Pencil, Save, User, Farm, Building, Upload, FileCheck, MapPin, Phone, Mail, Loader2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 
 const FarmerProfile = () => {
   const { profile, updateProfile } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("profile");
-  const [loading, setLoading] = useState(false);
-  const [isEditingFarm, setIsEditingFarm] = useState(false);
-  const [personalInfo, setPersonalInfo] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    address: ""
-  });
-  const [farmInfo, setFarmInfo] = useState({
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [farmDetails, setFarmDetails] = useState({
     farmName: "",
+    farmType: "",
     farmSize: "",
-    primaryCrops: "",
-    farmDescription: "",
-    certifications: ""
+    farmSizeUnit: "acres",
+    farmAddress: "",
+    farmPhone: "",
+    farmEmail: "",
+    soilType: "",
+    irrigationType: ""
   });
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
-    email: {
-      orders: true,
-      shipments: true,
-      bids: true,
-      appointments: true,
-      pricingAlerts: true,
-      promotions: false
-    },
-    push: {
-      orders: true,
-      shipments: true,
-      bids: true,
-      appointments: true,
-      pricingAlerts: true,
-      promotions: false
-    }
+  const [businessDetails, setBusinessDetails] = useState({
+    businessName: "",
+    businessType: "",
+    registrationNumber: "",
+    gstNumber: "",
+    businessAddress: "",
+    businessPhone: "",
+    businessEmail: "",
+    businessWebsite: ""
   });
-  const [userSettings, setUserSettings] = useState<NotificationSettings>({
-    email: {
-      orders: true,
-      shipments: true,
-      bids: true,
-      appointments: true,
-      pricingAlerts: true,
-      promotions: false
-    },
-    push: {
-      orders: true,
-      shipments: true,
-      bids: true,
-      appointments: true,
-      pricingAlerts: true,
-      promotions: false
-    }
-  });
-
+  const [documents, setDocuments] = useState([]);
+  
+  // Fetch profile details on component mount
   useEffect(() => {
-    const fetchNotificationSettings = async () => {
-      if (!profile?.id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('notification_settings')
-          .select('settings')
-          .eq('user_id', profile.id)
-          .single();
-        
-        if (error) {
-          if (error.code === 'PGRST116') {
-            const { error: insertError } = await supabase
-              .from('notification_settings')
-              .insert({
-                user_id: profile.id,
-                settings: JSON.stringify(notificationSettings)
-              });
-            
-            if (insertError) throw insertError;
-          } else {
-            throw error;
-          }
-        } else if (data) {
-          // Parse the JSON data safely
-          try {
-            const parsedSettings = typeof data.settings === 'string' 
-              ? JSON.parse(data.settings) 
-              : data.settings;
-            
-            setNotificationSettings(parsedSettings as NotificationSettings);
-          } catch (parseError) {
-            console.error('Error parsing notification settings:', parseError);
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching notification settings:', err);
-      }
-    };
-    
-    fetchNotificationSettings();
+    if (profile?.id) {
+      fetchFarmDetails();
+      fetchBusinessDetails();
+      fetchDocuments();
+      setLoading(false);
+    }
   }, [profile?.id]);
   
-  useEffect(() => {
-    if (profile) {
-      const nameParts = profile.name.split(' ');
-      const firstName = nameParts[0] || "";
-      const lastName = nameParts.slice(1).join(' ') || "";
+  const fetchFarmDetails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('farm_details')
+        .select('*')
+        .eq('user_id', profile.id)
+        .single();
       
-      setPersonalInfo({
-        firstName,
-        lastName,
-        email: profile.email || "",
-        phone: profile.phone || "",
-        address: profile.address || ""
-      });
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
       
-      const farmDetails = profile.farm_details;
-      if (farmDetails) {
-        setFarmInfo({
-          farmName: farmDetails.farm_name || "",
-          farmSize: farmDetails.farm_size?.toString() || "",
-          primaryCrops: farmDetails.primary_crops || "",
-          farmDescription: farmDetails.description || "",
-          certifications: farmDetails.certifications || ""
+      if (data) {
+        setFarmDetails({
+          farmName: data.farm_name || "",
+          farmType: data.farm_type || "",
+          farmSize: data.farm_size?.toString() || "",
+          farmSizeUnit: data.farm_size_unit || "acres",
+          farmAddress: data.farm_address || "",
+          farmPhone: data.farm_phone || "",
+          farmEmail: data.farm_email || "",
+          soilType: data.soil_type || "",
+          irrigationType: data.irrigation_type || ""
         });
       }
-    }
-  }, [profile]);
-  
-  const handleUpdatePersonalInfo = async () => {
-    if (!profile) return;
-    
-    setLoading(true);
-    
-    try {
-      const fullName = `${personalInfo.firstName} ${personalInfo.lastName}`.trim();
-      
-      const { error } = await updateProfile({
-        name: fullName,
-        phone: personalInfo.phone,
-        address: personalInfo.address
+    } catch (error) {
+      console.error('Error fetching farm details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch farm details.",
+        variant: "destructive"
       });
+    }
+  };
+  
+  const fetchBusinessDetails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('business_details')
+        .select('*')
+        .eq('user_id', profile.id)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+      
+      if (data) {
+        setBusinessDetails({
+          businessName: data.business_name || "",
+          businessType: data.business_type || "",
+          registrationNumber: data.registration_number || "",
+          gstNumber: data.gst_number || "",
+          businessAddress: data.business_address || "",
+          businessPhone: data.business_phone || "",
+          businessEmail: data.business_email || "",
+          businessWebsite: data.business_website || ""
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching business details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch business details.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const fetchDocuments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       
+      setDocuments(data || []);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+    }
+  };
+  
+  const handleFarmDetailsChange = (e) => {
+    const { id, value } = e.target;
+    setFarmDetails(prev => ({
+      ...prev,
+      [id]: value
+    }));
+  };
+  
+  const handleBusinessDetailsChange = (e) => {
+    const { id, value } = e.target;
+    setBusinessDetails(prev => ({
+      ...prev,
+      [id]: value
+    }));
+  };
+  
+  const handleSaveFarmDetails = async () => {
+    setSaving(true);
+    
+    try {
+      // Validate farm size
+      const farmSize = parseFloat(farmDetails.farmSize);
+      if (isNaN(farmSize) || farmSize <= 0) {
+        throw new Error("Farm size must be a positive number");
+      }
+      
+      const farmData = {
+        user_id: profile.id,
+        farm_name: farmDetails.farmName,
+        farm_type: farmDetails.farmType,
+        farm_size: farmSize,
+        farm_size_unit: farmDetails.farmSizeUnit,
+        farm_address: farmDetails.farmAddress,
+        farm_phone: farmDetails.farmPhone,
+        farm_email: farmDetails.farmEmail,
+        soil_type: farmDetails.soilType,
+        irrigation_type: farmDetails.irrigationType
+      };
+      
+      const { error } = await supabase
+        .from('farm_details')
+        .upsert(farmData, { onConflict: 'user_id' });
+      
+      if (error) throw error;
+      
+      // Update profile with summary in farm_details field
+      await updateProfile({
+        farm_details: {
+          name: farmDetails.farmName,
+          type: farmDetails.farmType,
+          size: farmSize,
+          unit: farmDetails.farmSizeUnit
+        }
+      });
+      
       toast({
         title: "Success",
-        description: "Personal information updated successfully",
-        variant: "default"
+        description: "Farm details updated successfully."
       });
-    } catch (err) {
-      console.error('Error updating personal info:', err);
+    } catch (error) {
+      console.error('Error saving farm details:', error);
       toast({
         title: "Error",
-        description: "Failed to update personal information",
+        description: error.message || "Failed to save farm details.",
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
   
-  const handleUpdateFarm = async (farmData) => {
+  const handleSaveBusinessDetails = async () => {
+    setSaving(true);
+    
     try {
-      const updates = {
-        farm_details: farmData
+      const businessData = {
+        user_id: profile.id,
+        business_name: businessDetails.businessName,
+        business_type: businessDetails.businessType,
+        registration_number: businessDetails.registrationNumber,
+        gst_number: businessDetails.gstNumber,
+        business_address: businessDetails.businessAddress,
+        business_phone: businessDetails.businessPhone,
+        business_email: businessDetails.businessEmail,
+        business_website: businessDetails.businessWebsite
       };
       
-      const { error } = await updateProfile(updates);
+      const { error } = await supabase
+        .from('business_details')
+        .upsert(businessData, { onConflict: 'user_id' });
       
       if (error) throw error;
+      
+      // Update profile with summary in business_details field
+      await updateProfile({
+        business_details: {
+          name: businessDetails.businessName,
+          type: businessDetails.businessType,
+          registration: businessDetails.registrationNumber
+        }
+      });
       
       toast({
         title: "Success",
-        description: "Farm details updated successfully",
-        variant: "default"
+        description: "Business details updated successfully."
       });
-      
-      setIsEditingFarm(false);
-    } catch (err) {
-      console.error('Error updating farm details:', err);
+    } catch (error) {
+      console.error('Error saving business details:', error);
       toast({
         title: "Error",
-        description: "Failed to update farm details",
+        description: "Failed to save business details.",
         variant: "destructive"
       });
+    } finally {
+      setSaving(false);
     }
   };
   
-  const handleUpdateNotificationSettings = async (type: keyof NotificationSettings, setting: string, value: boolean) => {
-    if (!profile?.id) return;
+  const handleUploadDocument = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
     
     try {
-      const updatedSettings = {
-        ...notificationSettings,
-        [type]: {
-          ...notificationSettings[type],
-          [setting]: value
-        }
-      };
+      // Create a unique file name
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
       
-      setNotificationSettings(updatedSettings);
+      // Upload file to storage
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(fileName, file);
       
-      const { error } = await supabase
-        .from('notification_settings')
-        .update({
-          settings: JSON.stringify(updatedSettings)
-        })
-        .eq('user_id', profile.id);
+      if (uploadError) throw uploadError;
       
-      if (error) throw error;
-    } catch (err) {
-      console.error('Error updating notification settings:', err);
+      // Get the public URL
+      const { data } = supabase.storage
+        .from('documents')
+        .getPublicUrl(fileName);
+      
+      // Save document reference to database
+      const { error: dbError } = await supabase
+        .from('documents')
+        .insert({
+          user_id: profile.id,
+          title: file.name,
+          document_type: 'verification', // Default type
+          file_url: data.publicUrl,
+          status: 'pending'
+        });
+      
+      if (dbError) throw dbError;
+      
+      toast({
+        title: "Success",
+        description: "Document uploaded successfully."
+      });
+      
+      // Refresh documents list
+      fetchDocuments();
+      
+    } catch (error) {
+      console.error('Error uploading document:', error);
       toast({
         title: "Error",
-        description: "Failed to update notification settings",
+        description: "Failed to upload document.",
         variant: "destructive"
       });
     }
   };
   
-  const handleSaveNotificationSettings = async (settings: NotificationSettings) => {
-    try {
-      const { error } = await supabase
-        .from('notification_settings')
-        .upsert({
-          user_id: profile?.id,
-          settings: JSON.stringify(settings)
-        });
-      
-      if (error) throw error;
-      
-      setUserSettings(settings);
-      toast({
-        title: "Settings Saved",
-        description: "Notification preferences have been updated.",
-        variant: "default"
-      });
-    } catch (err) {
-      console.error('Error updating notification settings:', err);
-      toast({
-        title: "Error",
-        description: "Failed to save notification settings.",
-        variant: "destructive"
-      });
-    }
-  };
+  if (loading) {
+    return (
+      <DashboardLayout userRole="farmer">
+        <div className="flex items-center justify-center h-[70vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
   
   return (
     <DashboardLayout userRole="farmer">
-      <DashboardHeader title="My Profile" userName={profile?.name || ""} userRole="farmer" />
+      <DashboardHeader title="My Profile" userName={profile?.name || "Farmer"} userRole="farmer" />
       
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <Card className="lg:col-span-1">
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center">
-              <div className="relative mt-2 mb-6">
-                <Avatar className="h-32 w-32">
-                  <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.name || "User"}`} alt={profile?.name || "User"} />
-                  <AvatarFallback>{profile?.name?.split(' ').map(n => n[0]).join('') || "U"}</AvatarFallback>
-                </Avatar>
-                <Button variant="outline" size="icon" className="absolute bottom-0 right-0 rounded-full bg-background">
-                  <Upload className="h-4 w-4" />
-                </Button>
-              </div>
-              <h2 className="text-xl font-semibold">{profile?.name || "User"}</h2>
-              <p className="text-sm text-muted-foreground mb-1">Organic Wheat Farmer</p>
-              <Badge variant="outline" className="bg-agri-farmer/10 text-agri-farmer mb-4">Verified Farmer</Badge>
-              
-              <div className="w-full space-y-3 mt-2">
-                <div className="flex items-center text-sm">
-                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span>{profile?.address || profile?.city || "No address provided"}</span>
-                </div>
-                <div className="flex items-center text-sm">
-                  <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span>{profile?.phone || "No phone number provided"}</span>
-                </div>
-                <div className="flex items-center text-sm">
-                  <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span>{profile?.email || "No email provided"}</span>
-                </div>
-                <div className="flex items-center text-sm">
-                  <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span>Member since {profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "Recently"}</span>
-                </div>
-              </div>
-              
-              <div className="w-full mt-6 pt-6 border-t">
-                <h3 className="font-medium mb-2">Certifications</h3>
-                <div className="flex flex-wrap gap-2">
-                  {profile?.farm_details?.certifications ? (
-                    profile.farm_details.certifications.split(',').map((cert, index) => (
-                      <Badge key={index} variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                        {cert.trim()}
-                      </Badge>
-                    ))
-                  ) : (
-                    <>
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Organic Certified</Badge>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Quality Assured</Badge>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="farm" className="space-y-6">
+        <TabsList className="w-full md:w-auto grid grid-cols-3 md:inline-flex mb-6">
+          <TabsTrigger value="farm">Farm Details</TabsTrigger>
+          <TabsTrigger value="business">Business Details</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+        </TabsList>
         
-        <div className="lg:col-span-3">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full grid grid-cols-3 mb-6">
-              <TabsTrigger value="profile">Personal Info</TabsTrigger>
-              <TabsTrigger value="farm">Farm Details</TabsTrigger>
-              <TabsTrigger value="settings">Account Settings</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="profile">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <User className="h-5 w-5 mr-2" />
-                    Personal Information
-                  </CardTitle>
-                  <CardDescription>Update your personal details</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleUpdatePersonalInfo(); }}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="firstName">First Name</Label>
-                        <Input 
-                          id="firstName" 
-                          value={personalInfo.firstName}
-                          onChange={(e) => setPersonalInfo(prev => ({ ...prev, firstName: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="lastName">Last Name</Label>
-                        <Input 
-                          id="lastName" 
-                          value={personalInfo.lastName}
-                          onChange={(e) => setPersonalInfo(prev => ({ ...prev, lastName: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
-                        <Input 
-                          id="email" 
-                          type="email" 
-                          value={personalInfo.email}
-                          onChange={(e) => setPersonalInfo(prev => ({ ...prev, email: e.target.value }))}
-                          disabled
-                        />
-                        <p className="text-xs text-muted-foreground">Email cannot be changed</p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <Input 
-                          id="phone" 
-                          value={personalInfo.phone}
-                          onChange={(e) => setPersonalInfo(prev => ({ ...prev, phone: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="address">Address</Label>
-                      <Textarea 
-                        id="address" 
-                        value={personalInfo.address}
-                        onChange={(e) => setPersonalInfo(prev => ({ ...prev, address: e.target.value }))}
-                      />
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <Button type="submit" disabled={loading}>
-                        {loading ? "Saving..." : "Save Changes"}
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="farm">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Farm Details</CardTitle>
-                  <CardDescription>Information about your agricultural operations</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleUpdateFarm(farmInfo); }}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="farmName">Farm Name</Label>
-                        <Input 
-                          id="farmName" 
-                          value={farmInfo.farmName}
-                          onChange={(e) => setFarmInfo(prev => ({ ...prev, farmName: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="farmSize">Farm Size (Acres)</Label>
-                        <Input 
-                          id="farmSize" 
-                          type="number"
-                          value={farmInfo.farmSize}
-                          onChange={(e) => setFarmInfo(prev => ({ ...prev, farmSize: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="primaryCrops">Primary Crops</Label>
-                      <Input 
-                        id="primaryCrops" 
-                        value={farmInfo.primaryCrops}
-                        onChange={(e) => setFarmInfo(prev => ({ ...prev, primaryCrops: e.target.value }))}
-                        placeholder="e.g., Wheat, Rice, Lentils"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="farmDescription">Farm Description</Label>
-                      <Textarea 
-                        id="farmDescription" 
-                        value={farmInfo.farmDescription}
-                        onChange={(e) => setFarmInfo(prev => ({ ...prev, farmDescription: e.target.value }))}
-                        placeholder="Describe your farm, methods, and specialties"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="certifications">Certifications</Label>
-                      <Input 
-                        id="certifications" 
-                        value={farmInfo.certifications}
-                        onChange={(e) => setFarmInfo(prev => ({ ...prev, certifications: e.target.value }))}
-                        placeholder="e.g., Organic Certified, Quality Assured, Fair Trade"
-                      />
-                      <p className="text-xs text-muted-foreground">Separate multiple certifications with commas</p>
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <Button type="submit" disabled={loading}>
-                        {loading ? "Updating..." : "Update Farm Information"}
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="settings">
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Bell className="h-5 w-5 mr-2" />
-                      Notification Settings
-                    </CardTitle>
-                    <CardDescription>Manage how you receive notifications</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">Email Notifications</h4>
-                          <p className="text-sm text-muted-foreground">Receive email updates about your account activity</p>
-                        </div>
-                        <Switch 
-                          checked={Object.values(notificationSettings.email).some(v => v)} 
-                          onCheckedChange={(checked) => {
-                            const updatedEmail = Object.keys(notificationSettings.email).reduce((acc, key) => {
-                              acc[key as keyof typeof notificationSettings.email] = checked;
-                              return acc;
-                            }, {} as typeof notificationSettings.email);
-                            
-                            setNotificationSettings(prev => ({
-                              ...prev,
-                              email: updatedEmail
-                            }));
-                            
-                            if (profile?.id) {
-                              supabase
-                                .from('notification_settings')
-                                .update({
-                                  settings: {
-                                    ...notificationSettings,
-                                    email: updatedEmail
-                                  }
-                                })
-                                .eq('user_id', profile.id);
-                            }
-                          }}
-                        />
-                      </div>
-                      
-                      {Object.values(notificationSettings.email).some(v => v) && (
-                        <div className="pl-6 border-l space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-medium">Order Updates</h4>
-                              <p className="text-sm text-muted-foreground">Get notified about new orders and status changes</p>
-                            </div>
-                            <Switch 
-                              checked={notificationSettings.email.orders} 
-                              onCheckedChange={(checked) => handleUpdateNotificationSettings('email', 'orders', checked)}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-medium">Auction Alerts</h4>
-                              <p className="text-sm text-muted-foreground">Receive notifications about auction activity</p>
-                            </div>
-                            <Switch 
-                              checked={notificationSettings.email.bids} 
-                              onCheckedChange={(checked) => handleUpdateNotificationSettings('email', 'bids', checked)}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-medium">Price Alerts</h4>
-                              <p className="text-sm text-muted-foreground">Get notified when market prices change significantly</p>
-                            </div>
-                            <Switch 
-                              checked={notificationSettings.email.pricingAlerts} 
-                              onCheckedChange={(checked) => handleUpdateNotificationSettings('email', 'pricingAlerts', checked)}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-medium">Marketing Updates</h4>
-                              <p className="text-sm text-muted-foreground">Receive information about new features and offers</p>
-                            </div>
-                            <Switch 
-                              checked={notificationSettings.email.promotions} 
-                              onCheckedChange={(checked) => handleUpdateNotificationSettings('email', 'promotions', checked)}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+        <TabsContent value="farm">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Farm className="h-5 w-5" />
+                Farm Details
+              </CardTitle>
+              <CardDescription>
+                Provide details about your farm to help traders understand your production capabilities
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="farmName">Farm Name</Label>
+                  <Input
+                    id="farmName"
+                    value={farmDetails.farmName}
+                    onChange={handleFarmDetailsChange}
+                    placeholder="Enter your farm name"
+                  />
+                </div>
                 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Shield className="h-5 w-5 mr-2" />
-                      Account Security
-                    </CardTitle>
-                    <CardDescription>Manage your account security settings</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      <div className="space-y-4">
-                        <h4 className="font-medium">Change Password</h4>
-                        <div className="space-y-2">
-                          <Label htmlFor="currentPassword">Current Password</Label>
-                          <Input id="currentPassword" type="password" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="newPassword">New Password</Label>
-                          <Input id="newPassword" type="password" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                          <Input id="confirmPassword" type="password" />
-                        </div>
-                      </div>
-                      
-                      <div className="pt-4 border-t">
-                        <h4 className="font-medium mb-2">Two-Factor Authentication</h4>
-                        <p className="text-sm text-muted-foreground mb-4">Add an extra layer of security to your account</p>
-                        <Button variant="outline" className="flex items-center gap-2">
-                          <Key className="h-4 w-4" />
-                          Enable Two-Factor Authentication
-                        </Button>
-                      </div>
-                      
-                      <div className="flex justify-end">
-                        <Button>Save Changes</Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="space-y-2">
+                  <Label htmlFor="farmType">Farm Type</Label>
+                  <Select
+                    value={farmDetails.farmType}
+                    onValueChange={(value) => setFarmDetails(prev => ({ ...prev, farmType: value }))}
+                  >
+                    <SelectTrigger id="farmType">
+                      <SelectValue placeholder="Select farm type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Organic">Organic</SelectItem>
+                      <SelectItem value="Conventional">Conventional</SelectItem>
+                      <SelectItem value="Mixed">Mixed</SelectItem>
+                      <SelectItem value="Sustainable">Sustainable</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="farmSize">Farm Size</Label>
+                  <Input
+                    id="farmSize"
+                    type="number"
+                    value={farmDetails.farmSize}
+                    onChange={handleFarmDetailsChange}
+                    placeholder="Enter farm size"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="farmSizeUnit">Unit</Label>
+                  <Select
+                    value={farmDetails.farmSizeUnit}
+                    onValueChange={(value) => setFarmDetails(prev => ({ ...prev, farmSizeUnit: value }))}
+                  >
+                    <SelectTrigger id="farmSizeUnit">
+                      <SelectValue placeholder="Select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="acres">Acres</SelectItem>
+                      <SelectItem value="hectares">Hectares</SelectItem>
+                      <SelectItem value="bigha">Bigha</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="soilType">Soil Type</Label>
+                  <Select
+                    value={farmDetails.soilType}
+                    onValueChange={(value) => setFarmDetails(prev => ({ ...prev, soilType: value }))}
+                  >
+                    <SelectTrigger id="soilType">
+                      <SelectValue placeholder="Select soil type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Clay">Clay</SelectItem>
+                      <SelectItem value="Sandy">Sandy</SelectItem>
+                      <SelectItem value="Silt">Silt</SelectItem>
+                      <SelectItem value="Loam">Loam</SelectItem>
+                      <SelectItem value="Black">Black</SelectItem>
+                      <SelectItem value="Red">Red</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="irrigationType">Irrigation Type</Label>
+                <Select
+                  value={farmDetails.irrigationType}
+                  onValueChange={(value) => setFarmDetails(prev => ({ ...prev, irrigationType: value }))}
+                >
+                  <SelectTrigger id="irrigationType">
+                    <SelectValue placeholder="Select irrigation type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Drip">Drip Irrigation</SelectItem>
+                    <SelectItem value="Sprinkler">Sprinkler System</SelectItem>
+                    <SelectItem value="Flood">Flood Irrigation</SelectItem>
+                    <SelectItem value="Furrow">Furrow Irrigation</SelectItem>
+                    <SelectItem value="Rain-fed">Rain-fed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-2">
+                <Label htmlFor="farmAddress" className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  Farm Address
+                </Label>
+                <Textarea
+                  id="farmAddress"
+                  value={farmDetails.farmAddress}
+                  onChange={handleFarmDetailsChange}
+                  placeholder="Enter complete farm address"
+                  rows={3}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="farmPhone" className="flex items-center gap-1">
+                    <Phone className="h-4 w-4" />
+                    Farm Contact Number
+                  </Label>
+                  <Input
+                    id="farmPhone"
+                    value={farmDetails.farmPhone}
+                    onChange={handleFarmDetailsChange}
+                    placeholder="Enter farm contact number"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="farmEmail" className="flex items-center gap-1">
+                    <Mail className="h-4 w-4" />
+                    Farm Email
+                  </Label>
+                  <Input
+                    id="farmEmail"
+                    type="email"
+                    value={farmDetails.farmEmail}
+                    onChange={handleFarmDetailsChange}
+                    placeholder="Enter farm email address"
+                  />
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={handleSaveFarmDetails} disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Farm Details
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="business">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="h-5 w-5" />
+                Business Details
+              </CardTitle>
+              <CardDescription>
+                Provide your business information for trading and invoicing purposes
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="businessName">Business Name</Label>
+                  <Input
+                    id="businessName"
+                    value={businessDetails.businessName}
+                    onChange={handleBusinessDetailsChange}
+                    placeholder="Enter your business name"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="businessType">Business Type</Label>
+                  <Select
+                    value={businessDetails.businessType}
+                    onValueChange={(value) => setBusinessDetails(prev => ({ ...prev, businessType: value }))}
+                  >
+                    <SelectTrigger id="businessType">
+                      <SelectValue placeholder="Select business type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Sole Proprietorship">Sole Proprietorship</SelectItem>
+                      <SelectItem value="Partnership">Partnership</SelectItem>
+                      <SelectItem value="LLC">Limited Liability Company (LLC)</SelectItem>
+                      <SelectItem value="Cooperative">Cooperative</SelectItem>
+                      <SelectItem value="Corporation">Corporation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="registrationNumber">Registration Number</Label>
+                  <Input
+                    id="registrationNumber"
+                    value={businessDetails.registrationNumber}
+                    onChange={handleBusinessDetailsChange}
+                    placeholder="Enter business registration number"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="gstNumber">GST Number</Label>
+                  <Input
+                    id="gstNumber"
+                    value={businessDetails.gstNumber}
+                    onChange={handleBusinessDetailsChange}
+                    placeholder="Enter GST number"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="businessAddress">Business Address</Label>
+                <Textarea
+                  id="businessAddress"
+                  value={businessDetails.businessAddress}
+                  onChange={handleBusinessDetailsChange}
+                  placeholder="Enter complete business address"
+                  rows={3}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="businessPhone">Business Phone</Label>
+                  <Input
+                    id="businessPhone"
+                    value={businessDetails.businessPhone}
+                    onChange={handleBusinessDetailsChange}
+                    placeholder="Enter business phone"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="businessEmail">Business Email</Label>
+                  <Input
+                    id="businessEmail"
+                    type="email"
+                    value={businessDetails.businessEmail}
+                    onChange={handleBusinessDetailsChange}
+                    placeholder="Enter business email"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="businessWebsite">Business Website</Label>
+                  <Input
+                    id="businessWebsite"
+                    value={businessDetails.businessWebsite}
+                    onChange={handleBusinessDetailsChange}
+                    placeholder="Enter business website URL"
+                  />
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={handleSaveBusinessDetails} disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Business Details
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="documents">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileCheck className="h-5 w-5" />
+                Documents & Verification
+              </CardTitle>
+              <CardDescription>
+                Upload important documents for verification and compliance
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-md p-8">
+                <Upload className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Upload Documents</h3>
+                <p className="text-muted-foreground text-center max-w-md mb-4">
+                  Upload documents such as ID proof, address proof, or farm certifications
+                </p>
+                <div className="relative">
+                  <input
+                    type="file"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={handleUploadDocument}
+                  />
+                  <Button>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Select File
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Uploaded Documents</h3>
+                {documents.length > 0 ? (
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left p-3">Document Name</th>
+                          <th className="text-left p-3">Type</th>
+                          <th className="text-left p-3">Status</th>
+                          <th className="text-left p-3">Uploaded On</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {documents.map((doc) => (
+                          <tr key={doc.id} className="border-t">
+                            <td className="p-3">
+                              <a 
+                                href={doc.file_url} 
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline"
+                              >
+                                {doc.title}
+                              </a>
+                            </td>
+                            <td className="p-3">{doc.document_type}</td>
+                            <td className="p-3">
+                              <Badge
+                                variant={
+                                  doc.status === 'verified' ? 'default' :
+                                  doc.status === 'pending' ? 'outline' :
+                                  'destructive'
+                                }
+                              >
+                                {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
+                              </Badge>
+                            </td>
+                            <td className="p-3">
+                              {new Date(doc.created_at).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center p-6 border rounded-md text-muted-foreground">
+                    No documents uploaded yet
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </DashboardLayout>
   );
 };

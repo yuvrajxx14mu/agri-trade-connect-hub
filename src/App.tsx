@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -43,6 +44,8 @@ import ProductForm from "./pages/ProductForm";
 import AuctionForm from "./pages/AuctionForm";
 import OrderDetail from "./pages/OrderDetail";
 import ShipmentDetail from "./pages/ShipmentDetail";
+import ShipmentForm from "./pages/ShipmentForm";
+import AppointmentForm from "./pages/AppointmentForm";
 
 const queryClient = new QueryClient();
 
@@ -116,6 +119,16 @@ const App = () => (
                 <FarmerShipments />
               </ProtectedRoute>
             } />
+            <Route path="/farmer-shipments/new" element={
+              <ProtectedRoute requiredRole="farmer">
+                <ShipmentForm />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-shipments/new/:orderId" element={
+              <ProtectedRoute requiredRole="farmer">
+                <ShipmentForm />
+              </ProtectedRoute>
+            } />
             <Route path="/farmer-shipments/:id" element={
               <ProtectedRoute requiredRole="farmer">
                 <ShipmentDetail />
@@ -124,6 +137,11 @@ const App = () => (
             <Route path="/farmer-appointments" element={
               <ProtectedRoute requiredRole="farmer">
                 <FarmerAppointments />
+              </ProtectedRoute>
+            } />
+            <Route path="/farmer-appointments/new" element={
+              <ProtectedRoute requiredRole="farmer">
+                <AppointmentForm />
               </ProtectedRoute>
             } />
             <Route path="/farmer-pricing" element={

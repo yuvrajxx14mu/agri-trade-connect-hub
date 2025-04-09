@@ -14,102 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  created_at: string;
-  read: boolean;
-  type: string;
-  related_id?: string;
-}
+import { useNotifications } from "@/hooks/useNotifications";
 
 const NotificationDropdown = () => {
   const { profile } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  
-  const fetchNotifications = async () => {
-    if (!profile?.id) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-        
-      if (error) throw error;
-      
-      setNotifications(data || []);
-      setUnreadCount(data?.filter(n => !n.read).length || 0);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    }
-  };
-  
-  useEffect(() => {
-    fetchNotifications();
-    
-    // Set up real-time subscription for notifications
-    if (profile?.id) {
-      const channel = supabase
-        .channel('notifications-changes')
-        .on('postgres_changes', 
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'notifications',
-            filter: `user_id=eq.${profile.id}`
-          }, 
-          () => {
-            fetchNotifications();
-          }
-        )
-        .subscribe();
-        
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [profile?.id]);
-  
-  const markAsRead = async (id: string) => {
-    try {
-      await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('id', id);
-        
-      // Update the local state
-      setNotifications(notifications.map(n => 
-        n.id === id ? { ...n, read: true } : n
-      ));
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-  
-  const markAllAsRead = async () => {
-    if (!profile?.id || notifications.length === 0) return;
-    
-    try {
-      await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('user_id', profile.id)
-        .eq('read', false);
-        
-      // Update the local state
-      setNotifications(notifications.map(n => ({ ...n, read: true })));
-      setUnreadCount(0);
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-    }
-  };
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   
   const renderIcon = (type: string) => {
     switch (type) {
@@ -158,7 +67,7 @@ const NotificationDropdown = () => {
         
         {notifications.length > 0 ? (
           <>
-            {notifications.map((notification) => (
+            {notifications.slice(0, 5).map((notification) => (
               <DropdownMenuItem 
                 key={notification.id} 
                 className={`p-3 cursor-pointer ${!notification.read ? 'bg-muted/50' : ''}`}
