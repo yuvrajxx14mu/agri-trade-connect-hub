@@ -17,6 +17,10 @@ interface AuthContextType {
     data: any | null;
   }>;
   signOut: () => Promise<void>;
+  updateProfile: (updates: any) => Promise<{
+    error: any | null;
+    data?: any | null;
+  }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -102,6 +106,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
   };
 
+  const updateProfile = async (updates: any) => {
+    if (!user) return { error: new Error("No user logged in") };
+
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .update(updates)
+        .eq("id", user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update the local profile state
+      setProfile({
+        ...profile,
+        ...updates
+      });
+
+      return { data, error: null };
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      return { error };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -112,6 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signIn,
         signUp,
         signOut,
+        updateProfile,
       }}
     >
       {children}
