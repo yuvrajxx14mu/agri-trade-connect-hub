@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,68 +10,92 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Truck, Package } from "lucide-react";
+import { Search, Truck, Package, Loader2 } from "lucide-react";
 import ShipmentCard from "@/components/ShipmentCard";
+import { useToast } from "@/hooks/use-toast";
 
 const TraderShipments = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("active");
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   
   useEffect(() => {
-    const fetchShipments = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('shipments')
-          .select(`
-            *,
-            order:orders(*),
-            items:shipment_items(*)
-          `)
-          .eq('trader_id', profile?.id)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        const transformedShipments = data.map(shipment => {
-          const progressValue = getShipmentProgress(shipment.status);
-          
-          return {
-            id: shipment.id,
-            orderId: shipment.order?.id || 'Unknown',
-            trackingNumber: shipment.tracking_number,
-            items: Array.isArray(shipment.items) 
-              ? shipment.items.map(item => ({
-                  name: item.product_name || 'Unknown product',
-                  quantity: item.quantity || 0
-                }))
-              : [],
-            status: shipment.status,
-            dispatchDate: shipment.dispatch_date ? new Date(shipment.dispatch_date) : null,
-            estimatedDelivery: shipment.estimated_delivery ? new Date(shipment.estimated_delivery) : null,
-            currentLocation: shipment.current_location || 'Unknown',
-            destination: shipment.destination || "Trader's Warehouse",
-            progress: progressValue
-          };
-        });
-
-        setShipments(transformedShipments);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
+    fetchShipments();
+    
+    // Set up real-time subscription for shipment updates
+    const channel = supabase
+      .channel('shipments-changes')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'shipments', filter: `trader_id=eq.${profile?.id}` }, 
+        () => { fetchShipments(); }
+      )
+      .on('postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'shipments', filter: `trader_id=eq.${profile?.id}` }, 
+        () => { fetchShipments(); }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
     };
-
-    if (profile?.id) {
-      fetchShipments();
-    }
   }, [profile?.id]);
+  
+  const fetchShipments = async () => {
+    if (!profile?.id) return;
+    
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('shipments')
+        .select(`
+          *,
+          order:orders(*),
+          items:shipment_items(*)
+        `)
+        .eq('trader_id', profile?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const transformedShipments = data.map(shipment => {
+        const progressValue = getShipmentProgress(shipment.status);
+        
+        return {
+          id: shipment.id,
+          orderId: shipment.order?.id || 'Unknown',
+          trackingNumber: shipment.tracking_number,
+          items: Array.isArray(shipment.items) 
+            ? shipment.items.map(item => ({
+                name: item.product_name || 'Unknown product',
+                quantity: item.quantity || 0
+              }))
+            : [],
+          status: shipment.status,
+          dispatchDate: shipment.dispatch_date ? new Date(shipment.dispatch_date) : null,
+          estimatedDelivery: shipment.estimated_delivery ? new Date(shipment.estimated_delivery) : null,
+          currentLocation: shipment.current_location || 'Unknown',
+          destination: shipment.destination || "Trader's Warehouse",
+          progress: progressValue
+        };
+      });
+
+      setShipments(transformedShipments);
+    } catch (err: any) {
+      console.error('Error fetching shipments:', err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to load shipments",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const getShipmentProgress = (status: string): number => {
     switch (status) {
@@ -104,9 +129,6 @@ const TraderShipments = () => {
   };
   
   const filteredShipments = getFilteredShipments();
-  
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
 
   return (
     <DashboardLayout userRole="trader">
@@ -154,7 +176,11 @@ const TraderShipments = () => {
               </div>
             </div>
             
-            {filteredShipments.length > 0 ? (
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredShipments.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredShipments.map((shipment) => (
                   <ShipmentCard

@@ -7,59 +7,84 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ShoppingCart } from "lucide-react";
+import { Search, ShoppingCart, Loader2 } from "lucide-react";
 import OrderCard from "@/components/OrderCard";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const TraderOrders = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("active");
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    const fetchOrders = async () => {
-      if (!profile?.id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select(`
-            id,
-            created_at,
-            status,
-            payment_status,
-            quantity,
-            price,
-            total_amount,
-            farmer_id,
-            profiles(name),
-            products(name)
-          `)
-          .eq('trader_id', profile.id)
-          .order('created_at', { ascending: false });
-          
-        if (error) throw error;
-        
-        setOrders(data || []);
-      } catch (error) {
-        console.error('Error fetching orders:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchOrders();
+
+    // Set up real-time subscription for order updates
+    const channel = supabase
+      .channel('orders-changes')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'orders', filter: `trader_id=eq.${profile?.id}` }, 
+        () => { fetchOrders(); }
+      )
+      .on('postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `trader_id=eq.${profile?.id}` }, 
+        () => { fetchOrders(); }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [profile?.id]);
+  
+  const fetchOrders = async () => {
+    if (!profile?.id) return;
+    
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          created_at,
+          status,
+          payment_status,
+          quantity,
+          price,
+          total_amount,
+          farmer_id,
+          profiles(id, name),
+          products(id, name, image_url)
+        `)
+        .eq('trader_id', profile.id)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      
+      setOrders(data || []);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load orders. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.profiles?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.products?.name.toLowerCase().includes(searchTerm.toLowerCase());
+      order.profiles?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.products?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesTab = 
       (activeTab === "active" && ["pending", "confirmed", "processing", "shipped"].includes(order.status)) ||
@@ -126,8 +151,8 @@ const TraderOrders = () => {
             </div>
             
             {loading ? (
-              <div className="text-center py-12">
-                <p>Loading orders...</p>
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : filteredOrders.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
 const Settings = () => {
@@ -65,9 +65,21 @@ const Settings = () => {
           .eq('user_id', profile.id)
           .single();
 
-        if (error) throw error;
-        
-        if (data && data.settings) {
+        if (error) {
+          // If no record exists yet, create one with default settings
+          if (error.code === 'PGRST116') {
+            const { error: insertError } = await supabase
+              .from('notification_settings')
+              .insert({
+                user_id: profile.id,
+                settings: settings
+              });
+            
+            if (insertError) throw insertError;
+          } else {
+            throw error;
+          }
+        } else if (data && data.settings) {
           // Safely type cast the settings data
           const settingsData = data.settings as {
             email: {
@@ -145,9 +157,12 @@ const Settings = () => {
     }
   };
 
+  // Get appropriate user role, default to "trader" if not available
+  const userRole = profile?.role || "trader";
+
   return (
-    <DashboardLayout userRole={profile?.role || "trader"}>
-      <DashboardHeader title="Settings" userName={profile?.name || "User"} />
+    <DashboardLayout userRole={userRole}>
+      <DashboardHeader title="Settings" userName={profile?.name || "User"} userRole={userRole} />
       
       <Card>
         <CardHeader>

@@ -50,6 +50,7 @@ const TraderAuctions = () => {
 
   const fetchAuctions = async () => {
     try {
+      setIsLoading(true);
       // First, fetch active auctions
       const { data: auctionsData, error: auctionsError } = await supabase
         .from('auctions')
@@ -96,7 +97,6 @@ const TraderAuctions = () => {
       setCategories(uniqueCategories);
       setLocations(uniqueLocations);
       setAuctions(auctionProducts);
-      setIsLoading(false);
     } catch (error) {
       console.error('Error fetching auctions:', error);
       toast({
@@ -104,6 +104,7 @@ const TraderAuctions = () => {
         description: "Failed to load auctions. Please try again.",
         variant: "destructive"
       });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -176,17 +177,6 @@ const TraderAuctions = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <DashboardLayout userRole="trader">
-        <DashboardHeader title="Auctions" userName={profile?.name || ""} userRole="trader" />
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </DashboardLayout>
-    );
-  }
-
   return (
     <DashboardLayout userRole="trader">
       <DashboardHeader title="Auctions" userName={profile?.name || ""} userRole="trader" />
@@ -239,7 +229,11 @@ const TraderAuctions = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {filteredAuctions.length > 0 ? (
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredAuctions.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAuctions.map((auction) => (
                 <Card key={auction.id} className="hover:shadow-lg transition-shadow">
@@ -281,7 +275,7 @@ const TraderAuctions = () => {
                   <div className="p-4 pt-0">
                     <Button 
                       className="w-full bg-agri-trader"
-                      onClick={() => navigate(`/trader-auctions/${auction.auction?.id}`)}
+                      onClick={() => navigate(`/trader-auctions/${auction.id}`)}
                     >
                       <Gavel className="mr-2 h-4 w-4" />
                       Place Bid
