@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,72 +66,89 @@ const AuctionPage = () => {
   const [bidAmount, setBidAmount] = useState("");
   const [userRole, setUserRole] = useState<"farmer" | "trader">("trader");
   const { toast } = useToast();
+  const [refreshInterval, setRefreshInterval] = useState<number | null>(null);
 
-  useEffect(() => {
-    const fetchAuction = async () => {
-      try {
-        // First fetch the auction details
-        const { data: auctionData, error: auctionError } = await supabase
-          .from('auctions')
-          .select('*')
-          .eq('id', id)
+  // Function to fetch auction data
+  const fetchAuction = async () => {
+    try {
+      // First fetch the auction details
+      const { data: auctionData, error: auctionError } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (auctionError) throw auctionError;
+
+      if (auctionData) {
+        // Then fetch the farmer profile separately
+        let farmerProfile: Profile;
+        const { data: farmerData, error: farmerError } = await supabase
+          .from('profiles')
+          .select('id, name, phone, address, city, state, role')
+          .eq('id', auctionData.farmer_id)
           .single();
 
-        if (auctionError) throw auctionError;
-
-        if (auctionData) {
-          // Then fetch the farmer profile separately
-          let farmerProfile: Profile;
-          const { data: farmerData, error: farmerError } = await supabase
-            .from('profiles')
-            .select('id, name, phone, address, city, state, role')
-            .eq('id', auctionData.farmer_id)
-            .single();
-
-          if (farmerError) {
-            console.error('Error fetching farmer profile:', farmerError);
-            // Create a minimal default profile
-            farmerProfile = {
-              id: auctionData.farmer_id,
-              name: "Unknown Farmer",
-              phone: null,
-              address: null,
-              city: "Unknown",
-              state: "Unknown",
-              role: "farmer"
-            };
-          } else {
-            farmerProfile = farmerData as Profile;
-          }
-
-          // Then fetch the bids separately
-          const { data: bidsData, error: bidsError } = await supabase
-            .from('bids')
-            .select('id, bidder_id, amount, created_at')
-            .eq('product_id', auctionData.product_id)
-            .order('amount', { ascending: false });
-
-          if (bidsError) {
-            console.error('Error fetching bids:', bidsError);
-          }
-
-          // Create properly typed auction object
-          const transformedAuction: Auction = {
-            ...auctionData,
-            farmer_profile: farmerProfile,
-            bids: (bidsData || []) as Bid[]
+        if (farmerError) {
+          console.error('Error fetching farmer profile:', farmerError);
+          // Create a minimal default profile
+          farmerProfile = {
+            id: auctionData.farmer_id,
+            name: "Unknown Farmer",
+            phone: null,
+            address: null,
+            city: "Unknown",
+            state: "Unknown",
+            role: "farmer"
           };
-          
-          setAuction(transformedAuction);
+        } else {
+          farmerProfile = farmerData as Profile;
         }
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+
+        // Then fetch the bids separately
+        const { data: bidsData, error: bidsError } = await supabase
+          .from('bids')
+          .select('id, bidder_id, amount, created_at')
+          .eq('product_id', auctionData.product_id)
+          .order('amount', { ascending: false });
+
+        if (bidsError) {
+          console.error('Error fetching bids:', bidsError);
+        }
+
+        // Create properly typed auction object
+        const transformedAuction: Auction = {
+          ...auctionData,
+          farmer_profile: farmerProfile,
+          bids: (bidsData || []) as Bid[]
+        };
+        
+        setAuction(transformedAuction);
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAuction();
+    
+    // Set up a refresh interval for active auctions
+    const interval = window.setInterval(() => {
+      if (auction?.status === 'active') {
+        fetchAuction();
+      }
+    }, 10000); // Refresh every 10 seconds
+    
+    setRefreshInterval(interval);
+    
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
       }
     };
-
-    fetchAuction();
   }, [id]);
 
   useEffect(() => {
@@ -147,16 +165,29 @@ const AuctionPage = () => {
     const now = new Date();
     const diff = end.getTime() - now.getTime();
     
+    if (diff <= 0) return "Auction ended";
+    
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     
-    return `${days} days, ${hours} hours`;
+    if (days > 0) {
+      return `${days} days, ${hours} hours`;
+    } else if (hours > 0) {
+      return `${hours} hours, ${minutes} minutes`;
+    } else {
+      return `${minutes} minutes`;
+    }
   };
 
   const calculateProgress = (startTime: string, endTime: string) => {
     const start = new Date(startTime);
     const end = new Date(endTime);
     const now = new Date();
+    
+    if (now < start) return 0;
+    if (now > end) return 100;
+    
     const total = end.getTime() - start.getTime();
     const elapsed = now.getTime() - start.getTime();
     return Math.round((elapsed / total) * 100);
@@ -167,6 +198,11 @@ const AuctionPage = () => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     
+    const minutes = Math.floor(diff / (1000 * 60));
+    if (minutes < 60) {
+      return `${minutes} minutes ago`;
+    }
+    
     const hours = Math.floor(diff / (1000 * 60 * 60));
     if (hours < 24) {
       return `${hours} hours ago`;
@@ -175,10 +211,30 @@ const AuctionPage = () => {
   };
 
   const handlePlaceBid = async () => {
-    if (!auction || !bidAmount || parseFloat(bidAmount) <= auction.current_price) {
+    if (!auction || !bidAmount || !profile) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid bid amount and ensure you're logged in",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const bidValue = parseFloat(bidAmount);
+    
+    if (bidValue <= auction.current_price) {
       toast({
         title: "Invalid Bid",
-        description: "Please enter an amount higher than the current bid",
+        description: `Please enter an amount higher than the current bid (₹${auction.current_price})`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (auction.min_increment && bidValue < auction.current_price + auction.min_increment) {
+      toast({
+        title: "Invalid Bid",
+        description: `Your bid must be at least ₹${auction.min_increment} more than the current price`,
         variant: "destructive"
       });
       return;
@@ -189,9 +245,10 @@ const AuctionPage = () => {
         .from('bids')
         .insert({
           product_id: auction.product_id,
-          bidder_id: profile?.id,
-          bidder_name: profile?.name || '',
-          amount: parseFloat(bidAmount)
+          bidder_id: profile.id,
+          bidder_name: profile.name || '',
+          amount: bidValue,
+          status: 'active'
         });
 
       if (error) throw error;
@@ -199,7 +256,7 @@ const AuctionPage = () => {
       // Update auction current price
       const { error: updateError } = await supabase
         .from('auctions')
-        .update({ current_price: parseFloat(bidAmount) })
+        .update({ current_price: bidValue })
         .eq('id', auction.id);
 
       if (updateError) throw updateError;
@@ -251,9 +308,19 @@ const AuctionPage = () => {
         bids: (refreshedBids || []) as Bid[]
       });
       
+      // Create notification for farmer
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: auction.farmer_id,
+          title: "New Bid Received",
+          message: `A new bid of ₹${bidValue} has been placed on your auction`,
+          type: "bid"
+        });
+      
       toast({
         title: "Bid Placed Successfully!",
-        description: `You've placed a bid of ₹${parseFloat(bidAmount).toLocaleString()}`
+        description: `You've placed a bid of ₹${bidValue.toLocaleString()}`
       });
       setBidAmount("");
     } catch (err) {
@@ -266,9 +333,38 @@ const AuctionPage = () => {
     }
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-  if (!auction) return <div>Auction not found</div>;
+  if (loading) return (
+    <DashboardLayout userRole={userRole}>
+      <div className="flex items-center justify-center h-[80vh]">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-4"></div>
+          <p>Loading auction details...</p>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+  
+  if (error) return (
+    <DashboardLayout userRole={userRole}>
+      <div className="flex items-center justify-center h-[80vh]">
+        <div className="text-center bg-red-50 p-8 rounded-lg">
+          <p className="text-red-600 mb-2">Error: {error}</p>
+          <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+  
+  if (!auction) return (
+    <DashboardLayout userRole={userRole}>
+      <div className="flex items-center justify-center h-[80vh]">
+        <div className="text-center">
+          <p className="mb-4">Auction not found</p>
+          <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
 
   return (
     <DashboardLayout userRole={userRole}>
@@ -284,7 +380,8 @@ const AuctionPage = () => {
         
         <DashboardHeader 
           title={userRole === "farmer" ? "Manage Auction" : "Auction Details"} 
-          userName={userRole === "farmer" ? "Rajesh Kumar" : "Vikram Sharma"} 
+          userName={profile?.name || "User"} 
+          userRole={userRole}
         />
       </div>
       
@@ -309,11 +406,18 @@ const AuctionPage = () => {
                   </CardDescription>
                 </div>
                 <Badge 
-                  className="bg-blue-50 text-blue-700 border-blue-200 flex items-center"
+                  className={`flex items-center ${
+                    auction.status === 'active'
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      : auction.status === 'completed'
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : 'bg-gray-50 text-gray-700 border-gray-200'
+                  }`}
                   variant="outline"
                 >
                   <Gavel className="mr-1 h-4 w-4" />
-                  {auction.status === 'active' ? 'Active Auction' : 'Ended'}
+                  {auction.status === 'active' ? 'Active Auction' : 
+                   auction.status === 'completed' ? 'Completed' : 'Ended'}
                 </Badge>
               </div>
             </CardHeader>
@@ -334,21 +438,21 @@ const AuctionPage = () => {
                   <Tag className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Starting Price</p>
-                    <p className="text-sm text-muted-foreground">₹{auction.start_price}/Quintal</p>
+                    <p className="text-sm text-muted-foreground">₹{auction.start_price.toLocaleString()}/Quintal</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-4 mt-2">
                   <ArrowBigUp className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Current Price</p>
-                    <p className="text-sm text-muted-foreground">₹{auction.current_price}/Quintal</p>
+                    <p className="text-sm text-muted-foreground">₹{auction.current_price.toLocaleString()}/Quintal</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-4 mt-2">
                   <Tag className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Minimum Increment</p>
-                    <p className="text-sm text-muted-foreground">₹{auction.min_increment}/Quintal</p>
+                    <p className="text-sm text-muted-foreground">₹{auction.min_increment.toLocaleString()}/Quintal</p>
                   </div>
                 </div>
               </div>
@@ -399,12 +503,12 @@ const AuctionPage = () => {
                 
                 <div className="space-y-2">
                   <Label>Current Bid</Label>
-                  <p className="text-2xl font-bold">₹{auction.current_price}/Quintal</p>
+                  <p className="text-2xl font-bold">₹{auction.current_price.toLocaleString()}/Quintal</p>
                 </div>
                 
                 <div className="space-y-2">
                   <Label>Minimum Increment</Label>
-                  <p className="text-sm text-muted-foreground">₹{auction.min_increment}/Quintal</p>
+                  <p className="text-sm text-muted-foreground">₹{auction.min_increment.toLocaleString()}/Quintal</p>
                 </div>
               </div>
             </CardContent>
@@ -412,9 +516,9 @@ const AuctionPage = () => {
               <Button 
                 className="w-full" 
                 onClick={handlePlaceBid}
-                disabled={userRole === "farmer"}
+                disabled={userRole === "farmer" || auction.status !== 'active'}
               >
-                Place Bid
+                {auction.status === 'active' ? 'Place Bid' : 'Auction Ended'}
               </Button>
             </CardFooter>
           </Card>
@@ -426,18 +530,26 @@ const AuctionPage = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {auction.bids.map((bid) => (
-                  <div key={bid.id} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">Bidder #{bid.bidder_id.slice(0, 8)}</span>
+                {auction.bids && auction.bids.length > 0 ? (
+                  auction.bids.map((bid) => (
+                    <div key={bid.id} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          {bid.bidder_id === profile?.id ? 'You' : `Bidder #${bid.bidder_id.slice(0, 8)}`}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">₹{bid.amount.toLocaleString()}/Quintal</p>
+                        <p className="text-xs text-muted-foreground">{formatTimeAgo(bid.created_at)}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">₹{bid.amount}/Quintal</p>
-                      <p className="text-xs text-muted-foreground">{formatTimeAgo(bid.created_at)}</p>
-                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">No bids yet</p>
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -13,62 +14,116 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Filter, Gavel, ShoppingBag, Package, Loader2 } from "lucide-react";
 import ProductCard from "@/components/ProductCard";
 import { formatCurrency } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+
+interface Product {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  price: number;
+  location: string;
+  status: string;
+  farmer_id: string;
+  farmer_name: string;
+  created_at: string;
+  image_url: string | null;
+  auction_id: string | null;
+}
 
 const TraderMarket = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [locationFilter, setLocationFilter] = useState("All");
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<string[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
+  const [refreshInterval, setRefreshInterval] = useState<number | null>(null);
+  
+  const fetchProducts = async () => {
+    try {
+      // Fetch active products with related data
+      const { data: marketProducts, error } = await supabase
+        .from('products')
+        .select(`
+          id,
+          name,
+          category,
+          description,
+          quantity,
+          unit,
+          price,
+          location,
+          status,
+          farmer_id,
+          farmer_name,
+          created_at,
+          image_url,
+          auction_id
+        `)
+        .eq('status', 'active');
+
+      if (error) throw error;
+
+      // Get unique categories and locations
+      const uniqueCategories = [...new Set(marketProducts?.map(p => p.category) || [])];
+      const uniqueLocations = [...new Set(marketProducts?.map(p => p.location) || [])];
+
+      setCategories(uniqueCategories);
+      setLocations(uniqueLocations);
+      setProducts(marketProducts || []);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load market products",
+        variant: "destructive"
+      });
+      setLoading(false);
+    }
+  };
   
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        // Fetch active products with related data
-        const { data: marketProducts, error } = await supabase
-          .from('products')
-          .select(`
-            id,
-            name,
-            category,
-            description,
-            quantity,
-            unit,
-            price,
-            location,
-            status,
-            farmer_id,
-            profiles (
-              name
-            ),
-            created_at,
-            image_url
-          `)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        // Get unique categories and locations
-        const uniqueCategories = [...new Set(marketProducts?.map(p => p.category) || [])];
-        const uniqueLocations = [...new Set(marketProducts?.map(p => p.location) || [])];
-
-        setCategories(uniqueCategories);
-        setLocations(uniqueLocations);
-        setProducts(marketProducts || []);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchProducts();
+    
+    // Set up a refresh interval
+    const interval = window.setInterval(() => {
+      fetchProducts();
+    }, 60000); // Refresh every minute
+    
+    setRefreshInterval(interval);
+    
+    // Set up real-time subscription for products
+    const channel = supabase
+      .channel('market-changes')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'products' }, 
+        () => {
+          fetchProducts();
+        }
+      )
+      .on('postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'products' }, 
+        () => {
+          fetchProducts();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+      supabase.removeChannel(channel);
+    };
   }, []);
   
   const filteredProducts = products.filter(product => {
@@ -76,7 +131,7 @@ const TraderMarket = () => {
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.profiles?.name.toLowerCase().includes(searchTerm.toLowerCase());
+      product.farmer_name.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesTab = activeTab === "all" || 
                        (activeTab === "direct" && !product.auction_id) ||
@@ -159,22 +214,34 @@ const TraderMarket = () => {
             </TabsList>
           </Tabs>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                id={product.id}
-                name={product.name}
-                category={product.category}
-                quantity={`${product.quantity} ${product.unit}`}
-                price={formatCurrency(product.price)}
-                location={product.location}
-                status={product.auction_id ? "In Auction" : "Listed"}
-                image={product.image_url}
-                userRole="trader"
-              />
-            ))}
-          </div>
+          {filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  id={product.id}
+                  name={product.name}
+                  category={product.category}
+                  quantity={`${product.quantity} ${product.unit}`}
+                  price={formatCurrency(product.price)}
+                  location={product.location}
+                  status={product.auction_id ? "In Auction" : "Listed"}
+                  image={product.image_url || undefined}
+                  userRole="trader"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                <Package className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">No products found</h3>
+              <p className="text-muted-foreground mb-6">
+                Try adjusting your filters or search terms
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </DashboardLayout>

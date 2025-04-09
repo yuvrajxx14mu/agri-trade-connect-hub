@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -6,12 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Gavel, Plus, Search, ArrowUpRight, Calendar, Eye, Ban } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/lib/utils";
+import { ColumnDef } from "@tanstack/react-table";
+import { useToast } from "@/hooks/use-toast";
 
 interface Auction {
   id: string;
@@ -30,61 +33,119 @@ interface Auction {
 const FarmerAuctions = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [refreshInterval, setRefreshInterval] = useState<number | null>(null);
+
+  // Function to fetch auctions
+  const fetchAuctions = async () => {
+    if (!profile?.id) return;
+
+    try {
+      // First fetch the auctions
+      const { data: auctionsData, error: auctionsError } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('farmer_id', profile.id);
+
+      if (auctionsError) throw auctionsError;
+
+      // Then fetch the products for these auctions
+      const productIds = auctionsData?.map(a => a.product_id) || [];
+      
+      if (productIds.length === 0) {
+        setAuctions([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .in('id', productIds);
+
+      if (productsError) throw productsError;
+
+      // Fetch bid counts for each auction
+      const bidCountPromises = auctionsData?.map(async (auction) => {
+        const { count, error: countError } = await supabase
+          .from('bids')
+          .select('id', { count: 'exact' })
+          .eq('product_id', auction.product_id);
+          
+        return { auctionId: auction.id, count: count || 0 };
+      }) || [];
+      
+      const bidCounts = await Promise.all(bidCountPromises);
+      const bidCountMap = Object.fromEntries(
+        bidCounts.map(item => [item.auctionId, item.count])
+      );
+
+      // Combine the data
+      const transformedAuctions = (auctionsData || []).map(auction => {
+        const product = productsData?.find(p => p.id === auction.product_id);
+        return {
+          id: auction.id,
+          product: {
+            name: product?.name || 'Unknown Product',
+            quantity: product?.quantity || 0,
+            unit: product?.unit || '',
+            price: product?.price || 0
+          },
+          currentBid: auction.current_price || auction.start_price,
+          bidCount: bidCountMap[auction.id] || 0,
+          endsIn: getTimeRemaining(new Date(auction.end_time)),
+          status: auction.status
+        };
+      });
+
+      setAuctions(transformedAuctions);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error fetching auctions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load auctions. Please try again.",
+        variant: "destructive"
+      });
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchAuctions = async () => {
-      if (!profile?.id) return;
-
-      try {
-        // First fetch the auctions
-        const { data: auctions, error: auctionsError } = await supabase
-          .from('auctions')
-          .select('*')
-          .eq('farmer_id', profile.id)
-          .eq('status', 'active');
-
-        if (auctionsError) throw auctionsError;
-
-        // Then fetch the products for these auctions
-        const productIds = auctions?.map(a => a.product_id) || [];
-        const { data: products, error: productsError } = await supabase
-          .from('products')
-          .select('*')
-          .in('id', productIds);
-
-        if (productsError) throw productsError;
-
-        // Combine the data
-        const transformedAuctions = (auctions || []).map(auction => {
-          const product = products?.find(p => p.id === auction.product_id);
-          return {
-            id: auction.id,
-            product: {
-              name: product?.name || '',
-              quantity: product?.quantity || 0,
-              unit: product?.unit || '',
-              price: product?.price || 0
-            },
-            currentBid: auction.current_price || auction.start_price,
-            bidCount: 0, // We'll need to fetch this separately if needed
-            endsIn: getTimeRemaining(new Date(auction.end_time)),
-            status: auction.status
-          };
-        });
-
-        setAuctions(transformedAuctions);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error fetching auctions:', error);
-        setIsLoading(false);
-      }
-    };
-
     fetchAuctions();
+    
+    // Set up a refresh interval for data
+    const interval = window.setInterval(() => {
+      fetchAuctions();
+    }, 60000); // Refresh every minute
+    
+    setRefreshInterval(interval);
+    
+    // Set up real-time subscription for bids
+    const channel = supabase
+      .channel('auction-changes')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'bids' }, 
+        () => {
+          fetchAuctions();
+        }
+      )
+      .on('postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'auctions' }, 
+        () => {
+          fetchAuctions();
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+      supabase.removeChannel(channel);
+    };
   }, [profile?.id]);
 
   // Helper function to calculate time remaining
@@ -100,22 +161,119 @@ const FarmerAuctions = () => {
     if (days > 0) return `${days} days`;
     return `${hours} hours`;
   };
+  
+  const handleCancelAuction = async (auctionId: string) => {
+    try {
+      // Confirm first
+      if (!window.confirm("Are you sure you want to cancel this auction?")) {
+        return;
+      }
+      
+      // Update auction status
+      const { error } = await supabase
+        .from('auctions')
+        .update({ status: 'cancelled' })
+        .eq('id', auctionId)
+        .eq('farmer_id', profile?.id);
+        
+      if (error) throw error;
+      
+      // Refresh the auctions list
+      fetchAuctions();
+      
+      toast({
+        title: "Auction Cancelled",
+        description: "The auction has been cancelled successfully"
+      });
+    } catch (error) {
+      console.error('Error cancelling auction:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel auction. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
 
-  // Filter auctions based on search term and status
-  const filteredAuctions = auctions.filter(auction => {
-    const matchesSearch = auction.product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === "all" || auction.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
-
-  if (isLoading) {
-    return (
-      <DashboardLayout userRole="farmer">
-        <DashboardHeader title="My Auctions" userName={profile?.name || ""} userRole="farmer" />
-        <div>Loading...</div>
-      </DashboardLayout>
-    );
-  }
+  const columns: ColumnDef<Auction>[] = [
+    {
+      accessorKey: "product.name",
+      header: "Product",
+      cell: ({ row }) => <div className="font-medium">{row.original.product.name}</div>
+    },
+    {
+      accessorKey: "product.quantity",
+      header: "Quantity",
+      cell: ({ row }) => (
+        <div>
+          {row.original.product.quantity} {row.original.product.unit}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "product.price",
+      header: "Starting Price",
+      cell: ({ row }) => formatCurrency(row.original.product.price),
+    },
+    {
+      accessorKey: "currentBid",
+      header: "Current Bid",
+      cell: ({ row }) => formatCurrency(row.original.currentBid),
+    },
+    {
+      accessorKey: "bidCount",
+      header: "Bids",
+      cell: ({ row }) => row.original.bidCount,
+    },
+    {
+      accessorKey: "endsIn",
+      header: "Time Left",
+      cell: ({ row }) => row.original.endsIn,
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => (
+        <Badge 
+          variant="outline" 
+          className={
+            row.original.status === "completed"
+              ? "bg-green-50 text-green-700 border-green-200"
+              : row.original.status === "cancelled"
+              ? "bg-red-50 text-red-700 border-red-200"
+              : "bg-blue-50 text-blue-700 border-blue-200"
+          }
+        >
+          {row.original.status}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(`/farmer-auctions/${row.original.id}`)}
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+          {row.original.status === "active" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-red-600"
+              onClick={() => handleCancelAuction(row.original.id)}
+            >
+              <Ban className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <DashboardLayout userRole="farmer">
@@ -126,108 +284,37 @@ const FarmerAuctions = () => {
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <CardTitle>Active Auctions</CardTitle>
+                <CardTitle>Auctions</CardTitle>
                 <CardDescription>Manage your ongoing product auctions</CardDescription>
               </div>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search auctions..."
-                      className="pl-8"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="w-36">
-                      <SelectValue placeholder="Filter Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button onClick={() => navigate("/farmer-products")}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Auction
-                </Button>
-              </div>
+              <Button onClick={() => navigate("/farmer-products")}>
+                <Plus className="mr-2 h-4 w-4" />
+                New Auction
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Starting Price</TableHead>
-                  <TableHead>Current Bid</TableHead>
-                  <TableHead>Bids</TableHead>
-                  <TableHead>Time Left</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAuctions.map((auction) => (
-                  <TableRow key={auction.id}>
-                    <TableCell className="font-medium">{auction.product.name}</TableCell>
-                    <TableCell>{auction.product.quantity} {auction.product.unit}</TableCell>
-                    <TableCell>{formatCurrency(auction.product.price)}</TableCell>
-                    <TableCell>{formatCurrency(auction.currentBid)}</TableCell>
-                    <TableCell>{auction.bidCount}</TableCell>
-                    <TableCell>{auction.endsIn}</TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant="outline" 
-                        className={
-                          auction.status === "completed"
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : auction.status === "cancelled"
-                            ? "bg-red-50 text-red-700 border-red-200"
-                            : "bg-blue-50 text-blue-700 border-blue-200"
-                        }
-                      >
-                        {auction.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => navigate(`/farmer-auctions/${auction.id}`)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {auction.status === "active" && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-red-600"
-                            onClick={() => {/* Handle cancel auction */}}
-                          >
-                            <Ban className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filteredAuctions.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
-                      No auctions found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+            {isLoading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            ) : (
+              <DataTable
+                columns={columns}
+                data={auctions}
+                searchKey="product.name"
+                searchPlaceholder="Search auctions..."
+                filterOptions={{
+                  key: "status",
+                  label: "Filter Status",
+                  options: [
+                    { label: "Active", value: "active" },
+                    { label: "Completed", value: "completed" },
+                    { label: "Cancelled", value: "cancelled" }
+                  ]
+                }}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
