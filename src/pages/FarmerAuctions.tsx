@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -38,12 +37,10 @@ const FarmerAuctions = () => {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [refreshInterval, setRefreshInterval] = useState<number | null>(null);
 
-  // Function to fetch auctions
   const fetchAuctions = async () => {
     if (!profile?.id) return;
 
     try {
-      // First fetch the auctions
       const { data: auctionsData, error: auctionsError } = await supabase
         .from('auctions')
         .select('*')
@@ -51,7 +48,6 @@ const FarmerAuctions = () => {
 
       if (auctionsError) throw auctionsError;
 
-      // Then fetch the products for these auctions
       const productIds = auctionsData?.map(a => a.product_id) || [];
       
       if (productIds.length === 0) {
@@ -67,7 +63,6 @@ const FarmerAuctions = () => {
 
       if (productsError) throw productsError;
 
-      // Fetch bid counts for each auction
       const bidCountPromises = auctionsData?.map(async (auction) => {
         const { count, error: countError } = await supabase
           .from('bids')
@@ -82,7 +77,6 @@ const FarmerAuctions = () => {
         bidCounts.map(item => [item.auctionId, item.count])
       );
 
-      // Combine the data
       const transformedAuctions = (auctionsData || []).map(auction => {
         const product = productsData?.find(p => p.id === auction.product_id);
         return {
@@ -116,14 +110,12 @@ const FarmerAuctions = () => {
   useEffect(() => {
     fetchAuctions();
     
-    // Set up a refresh interval for data
     const interval = window.setInterval(() => {
       fetchAuctions();
-    }, 60000); // Refresh every minute
+    }, 60000);
     
     setRefreshInterval(interval);
     
-    // Set up real-time subscription for bids
     const channel = supabase
       .channel('auction-changes')
       .on('postgres_changes', 
@@ -148,7 +140,6 @@ const FarmerAuctions = () => {
     };
   }, [profile?.id]);
 
-  // Helper function to calculate time remaining
   const getTimeRemaining = (endDate: Date) => {
     const now = new Date();
     const diff = endDate.getTime() - now.getTime();
@@ -164,12 +155,10 @@ const FarmerAuctions = () => {
   
   const handleCancelAuction = async (auctionId: string) => {
     try {
-      // Confirm first
       if (!window.confirm("Are you sure you want to cancel this auction?")) {
         return;
       }
       
-      // Update auction status
       const { error } = await supabase
         .from('auctions')
         .update({ status: 'cancelled' })
@@ -178,7 +167,6 @@ const FarmerAuctions = () => {
         
       if (error) throw error;
       
-      // Refresh the auctions list
       fetchAuctions();
       
       toast({
@@ -304,6 +292,7 @@ const FarmerAuctions = () => {
                 data={auctions}
                 searchKey="product.name"
                 searchPlaceholder="Search auctions..."
+                pageCount={1}
                 filterOptions={{
                   key: "status",
                   label: "Filter Status",

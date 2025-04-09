@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Save, User, Farm, Building, Upload, FileCheck, MapPin, Phone, Mail, Loader2 } from "lucide-react";
+import { Tractor, User, MapPin, Phone, Mail, Building, Crop, Droplets, Ruler } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 const FarmerProfile = () => {
@@ -44,7 +43,6 @@ const FarmerProfile = () => {
   });
   const [documents, setDocuments] = useState([]);
   
-  // Fetch profile details on component mount
   useEffect(() => {
     if (profile?.id) {
       fetchFarmDetails();
@@ -159,7 +157,6 @@ const FarmerProfile = () => {
     setSaving(true);
     
     try {
-      // Validate farm size
       const farmSize = parseFloat(farmDetails.farmSize);
       if (isNaN(farmSize) || farmSize <= 0) {
         throw new Error("Farm size must be a positive number");
@@ -184,7 +181,6 @@ const FarmerProfile = () => {
       
       if (error) throw error;
       
-      // Update profile with summary in farm_details field
       await updateProfile({
         farm_details: {
           name: farmDetails.farmName,
@@ -232,7 +228,6 @@ const FarmerProfile = () => {
       
       if (error) throw error;
       
-      // Update profile with summary in business_details field
       await updateProfile({
         business_details: {
           name: businessDetails.businessName,
@@ -262,29 +257,25 @@ const FarmerProfile = () => {
     if (!file) return;
     
     try {
-      // Create a unique file name
       const fileExt = file.name.split('.').pop();
       const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
       
-      // Upload file to storage
       const { error: uploadError } = await supabase.storage
         .from('documents')
         .upload(fileName, file);
       
       if (uploadError) throw uploadError;
       
-      // Get the public URL
       const { data } = supabase.storage
         .from('documents')
         .getPublicUrl(fileName);
       
-      // Save document reference to database
       const { error: dbError } = await supabase
         .from('documents')
         .insert({
           user_id: profile.id,
           title: file.name,
-          document_type: 'verification', // Default type
+          document_type: 'verification',
           file_url: data.publicUrl,
           status: 'pending'
         });
@@ -296,9 +287,7 @@ const FarmerProfile = () => {
         description: "Document uploaded successfully."
       });
       
-      // Refresh documents list
       fetchDocuments();
-      
     } catch (error) {
       console.error('Error uploading document:', error);
       toast({
@@ -334,7 +323,7 @@ const FarmerProfile = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Farm className="h-5 w-5" />
+                <Tractor className="h-5 w-5" />
                 Farm Details
               </CardTitle>
               <CardDescription>

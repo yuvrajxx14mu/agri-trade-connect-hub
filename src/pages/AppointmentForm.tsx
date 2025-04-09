@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -192,8 +191,8 @@ const AppointmentForm = () => {
               <div className="space-y-2">
                 <Label>Date</Label>
                 <DatePicker
-                  selected={date}
-                  onSelect={setDate}
+                  date={date}
+                  setDate={setDate}
                   disabled={(date) => date < new Date()}
                 />
               </div>

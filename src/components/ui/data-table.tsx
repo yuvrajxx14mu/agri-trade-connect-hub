@@ -6,17 +6,31 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 
-export function DataTable({ 
-  columns, 
-  data, 
-  searchKey, 
+interface DataTableProps {
+  columns: any;
+  data: any[];
+  searchKey?: string;
+  searchPlaceholder?: string;
+  showPagination?: boolean;
+  pageCount?: number;
+  filterOptions?: {
+    key: string;
+    label: string;
+    options: { label: string; value: string }[];
+  } | null;
+}
+
+export function DataTable({
+  columns,
+  data,
+  searchKey,
   searchPlaceholder = "Search...",
   showPagination = true,
   pageCount,
   filterOptions
-}) {
+}: DataTableProps) {
   const [sorting, setSorting] = useState([]);
-  const [columnFilters, setColumnFilters] = useState([]);
+  const [columnFilters, setColumnFilters] = useState<any[]>([]);
   const [filterValue, setFilterValue] = useState("all");
 
   const table = useReactTable({
@@ -34,7 +48,7 @@ export function DataTable({
     },
   });
 
-  const handleFilterChange = (value) => {
+  const handleFilterChange = (value: string) => {
     setFilterValue(value);
     if (filterOptions?.key) {
       if (value === "all") {

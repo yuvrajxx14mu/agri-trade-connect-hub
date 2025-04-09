@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -59,6 +58,8 @@ const ShipmentForm = () => {
       carrier: "",
       trackingNumber: "",
       destination: "",
+      dispatchDate: undefined,
+      estimatedDelivery: undefined,
       currentLocation: "",
       notes: "",
     },
@@ -66,7 +67,6 @@ const ShipmentForm = () => {
 
   const watchOrderId = form.watch("orderId");
 
-  // Fetch available orders (completed but not shipped)
   useEffect(() => {
     const fetchOrders = async () => {
       if (!profile?.id) return;
@@ -94,7 +94,6 @@ const ShipmentForm = () => {
         
         setOrders(data || []);
         
-        // If orderId is provided in URL, set it
         if (orderId) {
           form.setValue("orderId", orderId);
           fetchOrderDetails(orderId);
@@ -114,7 +113,6 @@ const ShipmentForm = () => {
     fetchOrders();
   }, [profile?.id, orderId, toast, form]);
   
-  // Fetch order details when order ID changes
   useEffect(() => {
     if (watchOrderId) {
       fetchOrderDetails(watchOrderId);
@@ -144,7 +142,6 @@ const ShipmentForm = () => {
       
       setSelectedOrder(data);
       
-      // Set destination based on trader's address
       if (data.profiles) {
         const trader = data.profiles;
         const address = [
@@ -199,7 +196,6 @@ const ShipmentForm = () => {
         
       if (error) throw error;
       
-      // Update order status to "shipped"
       const { error: orderError } = await supabase
         .from('orders')
         .update({ status: 'shipped' })
@@ -207,7 +203,6 @@ const ShipmentForm = () => {
         
       if (orderError) throw orderError;
       
-      // Create notification for trader
       await supabase.from('notifications').insert({
         user_id: selectedOrder.trader_id,
         title: "New Shipment Created",
@@ -256,7 +251,6 @@ const ShipmentForm = () => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-6">
-              {/* Order Selection */}
               <FormField
                 control={form.control}
                 name="orderId"
@@ -308,7 +302,6 @@ const ShipmentForm = () => {
               )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Carrier */}
                 <FormField
                   control={form.control}
                   name="carrier"
@@ -323,7 +316,6 @@ const ShipmentForm = () => {
                   )}
                 />
                 
-                {/* Tracking Number */}
                 <FormField
                   control={form.control}
                   name="trackingNumber"
@@ -340,7 +332,6 @@ const ShipmentForm = () => {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Dispatch Date */}
                 <FormField
                   control={form.control}
                   name="dispatchDate"
@@ -348,8 +339,8 @@ const ShipmentForm = () => {
                     <FormItem className="flex flex-col">
                       <FormLabel>Dispatch Date</FormLabel>
                       <DatePicker
-                        selected={field.value}
-                        onSelect={field.onChange}
+                        date={field.value}
+                        setDate={field.onChange}
                         disabled={(date) => date < new Date()}
                       />
                       <FormMessage />
@@ -357,7 +348,6 @@ const ShipmentForm = () => {
                   )}
                 />
                 
-                {/* Estimated Delivery */}
                 <FormField
                   control={form.control}
                   name="estimatedDelivery"
@@ -365,8 +355,8 @@ const ShipmentForm = () => {
                     <FormItem className="flex flex-col">
                       <FormLabel>Estimated Delivery</FormLabel>
                       <DatePicker
-                        selected={field.value}
-                        onSelect={field.onChange}
+                        date={field.value}
+                        setDate={field.onChange}
                         disabled={(date) => {
                           const dispatchDate = form.getValues("dispatchDate");
                           return dispatchDate && date < dispatchDate;
@@ -378,7 +368,6 @@ const ShipmentForm = () => {
                 />
               </div>
               
-              {/* Destination */}
               <FormField
                 control={form.control}
                 name="destination"
@@ -393,7 +382,6 @@ const ShipmentForm = () => {
                 )}
               />
               
-              {/* Current Location */}
               <FormField
                 control={form.control}
                 name="currentLocation"
@@ -411,7 +399,6 @@ const ShipmentForm = () => {
                 )}
               />
               
-              {/* Notes */}
               <FormField
                 control={form.control}
                 name="notes"
