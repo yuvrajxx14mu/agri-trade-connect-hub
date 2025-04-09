@@ -41,6 +41,8 @@ const shipmentSchema = z.object({
   notes: z.string().optional(),
 });
 
+type ShipmentFormValues = z.infer<typeof shipmentSchema>;
+
 const ShipmentForm = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
@@ -49,17 +51,15 @@ const ShipmentForm = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [orders, setOrders] = useState([]);
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
-  const form = useForm({
+  const form = useForm<ShipmentFormValues>({
     resolver: zodResolver(shipmentSchema),
     defaultValues: {
       orderId: orderId || "",
       carrier: "",
       trackingNumber: "",
       destination: "",
-      dispatchDate: undefined,
-      estimatedDelivery: undefined,
       currentLocation: "",
       notes: "",
     },
@@ -121,7 +121,7 @@ const ShipmentForm = () => {
     }
   }, [watchOrderId]);
   
-  const fetchOrderDetails = async (id) => {
+  const fetchOrderDetails = async (id: string) => {
     try {
       const { data, error } = await supabase
         .from('orders')

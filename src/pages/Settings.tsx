@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,7 +68,7 @@ const Settings = () => {
         if (error) throw error;
         
         if (data && data.settings) {
-          // Ensure proper type casting
+          // Safely type cast the settings data
           const settingsData = data.settings as {
             email: {
               bids: boolean;
@@ -145,7 +146,7 @@ const Settings = () => {
   };
 
   return (
-    <DashboardLayout>
+    <DashboardLayout userRole={profile?.role || "trader"}>
       <DashboardHeader title="Settings" userName={profile?.name || "User"} />
       
       <Card>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Tractor, User, MapPin, Phone, Mail, Building, Crop, Droplets, Ruler } from "lucide-react";
+import { Tractor, User, MapPin, Phone, Mail, Building, Crop, Droplets, Ruler, Loader2, FileCheck, Upload, Save } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 const FarmerProfile = () => {

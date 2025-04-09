@@ -52,9 +52,11 @@ export function DataTable({
     setFilterValue(value);
     if (filterOptions?.key) {
       if (value === "all") {
-        table.getColumn(filterOptions.key)?.setFilterValue("");
+        // Type assertion here to fix the 'unknown' type error
+        table.getColumn(filterOptions.key)?.setFilterValue("" as string);
       } else {
-        table.getColumn(filterOptions.key)?.setFilterValue(value);
+        // Type assertion here to fix the 'unknown' type error
+        table.getColumn(filterOptions.key)?.setFilterValue(value as string);
       }
     }
   };
