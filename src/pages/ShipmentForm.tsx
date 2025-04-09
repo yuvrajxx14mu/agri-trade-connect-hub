@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -142,17 +143,22 @@ const ShipmentForm = () => {
       
       setSelectedOrder(data);
       
+      // Fix: Check if profiles exists and is an array with at least one item
       if (data.profiles) {
-        const trader = data.profiles;
-        const address = [
-          trader.address,
-          trader.city,
-          trader.state,
-          trader.pincode
-        ].filter(Boolean).join(", ");
+        // Access the trader information correctly
+        const trader = Array.isArray(data.profiles) ? data.profiles[0] : data.profiles;
         
-        if (address) {
-          form.setValue("destination", address);
+        if (trader) {
+          const address = [
+            trader.address,
+            trader.city,
+            trader.state,
+            trader.pincode
+          ].filter(Boolean).join(", ");
+          
+          if (address) {
+            form.setValue("destination", address);
+          }
         }
       }
       
