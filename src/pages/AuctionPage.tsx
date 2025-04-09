@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,28 +55,6 @@ interface Auction {
   bids: Bid[];
 }
 
-type SupabaseAuctionResponse = {
-  id: string;
-  product_id: string;
-  farmer_id: string;
-  start_price: number;
-  current_price: number;
-  reserve_price: number | null;
-  min_increment: number;
-  quantity: number;
-  start_time: string;
-  end_time: string;
-  description: string | null;
-  auction_type: string;
-  allow_auto_bids: boolean;
-  visibility: string;
-  shipping_options: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  farmer_profile: Profile;
-};
-
 const AuctionPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -95,24 +72,34 @@ const AuctionPage = () => {
         // First fetch the auction details
         const { data: auctionData, error: auctionError } = await supabase
           .from('auctions')
-          .select(`
-            *,
-            farmer_profile:profiles!auctions_farmer_id_fkey(
-              id,
-              name,
-              phone,
-              address,
-              city,
-              state,
-              role
-            )
-          `)
+          .select('*')
           .eq('id', id)
           .single();
 
         if (auctionError) throw auctionError;
 
         if (auctionData) {
+          // Then fetch the farmer profile separately
+          const { data: farmerData, error: farmerError } = await supabase
+            .from('profiles')
+            .select('id, name, phone, address, city, state, role')
+            .eq('id', auctionData.farmer_id)
+            .single();
+
+          if (farmerError) {
+            console.error('Error fetching farmer profile:', farmerError);
+            // Create a minimal default profile
+            farmerData = {
+              id: auctionData.farmer_id,
+              name: "Unknown Farmer",
+              phone: null,
+              address: null,
+              city: "Unknown",
+              state: "Unknown",
+              role: "farmer"
+            };
+          }
+
           // Then fetch the bids separately
           const { data: bidsData, error: bidsError } = await supabase
             .from('bids')
@@ -124,10 +111,10 @@ const AuctionPage = () => {
             console.error('Error fetching bids:', bidsError);
           }
 
-          // Fix the type casting issue by creating a properly typed object
+          // Create properly typed auction object
           const transformedAuction: Auction = {
             ...auctionData,
-            farmer_profile: auctionData.farmer_profile as Profile,
+            farmer_profile: farmerData as Profile,
             bids: (bidsData || []) as Bid[]
           };
           
@@ -214,33 +201,35 @@ const AuctionPage = () => {
 
       if (updateError) throw updateError;
 
-      // Refresh auction data
-      const { data, error: fetchError } = await supabase
+      // Refresh auction data with separate queries like we do in the initial load
+      const { data: refreshedAuction, error: refreshError } = await supabase
         .from('auctions')
-        .select(`
-          *,
-          farmer_profile:profiles!inner(
-            id,
-            name,
-            phone,
-            address,
-            city,
-            state,
-            role
-          ),
-          bids(*)
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
-      if (fetchError) throw fetchError;
-      
-      // Fix type casting here too
+      if (refreshError) throw refreshError;
+
+      // Get updated farmer profile
+      const { data: farmerData, error: farmerError } = await supabase
+        .from('profiles')
+        .select('id, name, phone, address, city, state, role')
+        .eq('id', refreshedAuction.farmer_id)
+        .single();
+
+      // Get updated bids
+      const { data: refreshedBids, error: bidsError } = await supabase
+        .from('bids')
+        .select('id, bidder_id, amount, created_at')
+        .eq('product_id', refreshedAuction.product_id)
+        .order('amount', { ascending: false });
+
+      // Update the state with properly typed data
       setAuction({
-        ...data,
-        farmer_profile: data.farmer_profile as Profile,
-        bids: data.bids as Bid[]
-      } as Auction);
+        ...refreshedAuction,
+        farmer_profile: farmerData as Profile,
+        bids: (refreshedBids || []) as Bid[]
+      });
       
       toast({
         title: "Bid Placed Successfully!",
