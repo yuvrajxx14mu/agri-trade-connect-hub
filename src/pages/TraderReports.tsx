@@ -114,7 +114,7 @@ const TraderReports = () => {
 
   return (
     <DashboardLayout userRole="trader">
-      <DashboardHeader title="Reports & Analytics" userName="Vikram Sharma" />
+      <DashboardHeader title="Reports & Analytics" userName={profile?.name || "User"} userRole="trader" />
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full md:w-auto grid grid-cols-2 md:inline-flex mb-6">

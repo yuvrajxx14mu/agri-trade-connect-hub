@@ -95,7 +95,7 @@ const TraderShipments = () => {
 
   return (
     <DashboardLayout userRole="trader">
-      <DashboardHeader title="My Shipments" userName="Vikram Sharma" />
+      <DashboardHeader title="My Shipments" userName={profile?.name || "User"} userRole="trader" />
       
       <Card>
         <CardHeader>

@@ -9,6 +9,84 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      auctions: {
+        Row: {
+          id: string
+          product_id: string
+          farmer_id: string
+          start_price: number
+          current_price: number
+          reserve_price: number
+          min_increment: number
+          quantity: number
+          start_time: string
+          end_time: string
+          description: string
+          auction_type: string
+          allow_auto_bids: boolean
+          visibility: string
+          shipping_options: string
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          farmer_id: string
+          start_price: number
+          current_price: number
+          reserve_price: number
+          min_increment: number
+          quantity: number
+          start_time: string
+          end_time: string
+          description: string
+          auction_type: string
+          allow_auto_bids: boolean
+          visibility: string
+          shipping_options: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          farmer_id?: string
+          start_price?: number
+          current_price?: number
+          reserve_price?: number
+          min_increment?: number
+          quantity?: number
+          start_time?: string
+          end_time?: string
+          description?: string
+          auction_type?: string
+          allow_auto_bids?: boolean
+          visibility?: string
+          shipping_options?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auctions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auctions_farmer_id_fkey"
+            columns: ["farmer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       notifications: {
         Row: {
           id: string
@@ -339,7 +417,14 @@ export type Database = {
           updated_at?: string
           auction_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_farmer_id_fkey",
+            columns: ["farmer_id"],
+            referencedRelation: "profiles",
+            referencedColumns: ["id"]
+          }
+        ]
       }
       profiles: {
         Row: {

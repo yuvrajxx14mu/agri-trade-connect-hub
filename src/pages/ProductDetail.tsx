@@ -43,10 +43,17 @@ const ProductDetail = () => {
       if (!id) return;
       
       try {
-        // First fetch the product details
+        // First fetch the product details with farmer profile information
         const { data: productData, error: productError } = await supabase
           .from('products')
-          .select('*')
+          .select(`
+            *,
+            farmer:farmer_id (
+              id,
+              name,
+              avatar_url
+            )
+          `)
           .eq('id', id)
           .single();
           
@@ -62,25 +69,7 @@ const ProductDetail = () => {
           return;
         }
 
-        // Then fetch the farmer's profile
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select(`
-            id,
-            name
-          `)
-          .eq('id', productData.farmer_id)
-          .single();
-
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-        }
-        
-        // Combine the data
-        setProduct({
-          ...productData,
-          profiles: profileData || null
-        });
+        setProduct(productData);
       } catch (error) {
         console.error('Error fetching product:', error);
         toast({
@@ -105,6 +94,43 @@ const ProductDetail = () => {
       setUserRole("trader");
     }
   }, []);
+
+  // Check if current user is the product owner
+  const isProductOwner = profile?.id === product?.farmer_id;
+  
+  // Add handleDelete function
+  const handleDelete = async () => {
+    if (!id || !profile?.id) return;
+
+    // Confirm deletion
+    if (!window.confirm("Are you sure you want to delete this product?")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id)
+        .eq('farmer_id', profile.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Product Deleted",
+        description: "The product has been deleted successfully"
+      });
+
+      navigate('/farmer-products');
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the product",
+        variant: "destructive"
+      });
+    }
+  };
   
   if (loading) {
     return (
@@ -123,16 +149,16 @@ const ProductDetail = () => {
   const renderFarmerActions = () => (
     <div className="flex flex-col sm:flex-row gap-3">
       {product.status === "active" && (
-        <Button onClick={() => navigate(`/farmer-products/${id}/auction`)}>
+        <Button onClick={() => navigate(`/farmer-auctions/create?product=${id}`)}>
           <Gavel className="mr-2 h-4 w-4" />
           Create Auction
         </Button>
       )}
       <Button variant="outline" onClick={() => navigate(`/farmer-products/${id}/edit`)}>
         <Pencil className="mr-2 h-4 w-4" />
-        Edit Product
+        Edit
       </Button>
-      <Button variant="outline" className="text-destructive">
+      <Button variant="outline" className="text-destructive" onClick={handleDelete}>
         <Trash className="mr-2 h-4 w-4" />
         Delete
       </Button>
@@ -146,16 +172,18 @@ const ProductDetail = () => {
           <ShoppingCart className="mr-2 h-4 w-4" />
           Purchase Now
         </Button>
-      ) : product.status === "auction" && (
+      ) : product.status === "in_auction" && (
         <Button className="bg-agri-trader" onClick={() => navigate(`/trader-auctions/${id}`)}>
           <Gavel className="mr-2 h-4 w-4" />
           View Auction
         </Button>
       )}
-      <Button variant="outline" onClick={() => {}}>
-        <MessageCircle className="mr-2 h-4 w-4" />
-        Contact Seller
-      </Button>
+      {!isProductOwner && (
+        <Button variant="outline" onClick={() => {}}>
+          <MessageCircle className="mr-2 h-4 w-4" />
+          Contact Seller
+        </Button>
+      )}
     </div>
   );
   
@@ -176,6 +204,7 @@ const ProductDetail = () => {
         <DashboardHeader 
           title="Product Details" 
           userName={profile?.name || "User"} 
+          userRole={userRole}
         />
       </div>
       
@@ -200,13 +229,13 @@ const ProductDetail = () => {
                 <Badge 
                   className={product.status === "active" 
                     ? "bg-yellow-50 text-yellow-700 border-yellow-200" 
-                    : product.status === "auction" 
+                    : product.status === "in_auction" 
                     ? "bg-blue-50 text-blue-700 border-blue-200"
                     : "bg-green-50 text-green-700 border-green-200"}
                   variant="outline"
                 >
                   {product.status === "active" ? "Listed" : 
-                   product.status === "auction" ? "In Auction" : 
+                   product.status === "in_auction" ? "In Auction" : 
                    product.status.charAt(0).toUpperCase() + product.status.slice(1)}
                 </Badge>
               </div>
@@ -218,7 +247,7 @@ const ProductDetail = () => {
                     <div className="text-sm font-medium mb-1">Quantity Available</div>
                     <div className="text-2xl font-bold">{product.quantity} {product.unit}</div>
                   </div>
-                  <div className="mt-4 sm:mt-0">
+                  <div>
                     <div className="text-sm font-medium mb-1">Price Per {product.unit}</div>
                     <div className="text-2xl font-bold">{formatCurrency(product.price)}</div>
                   </div>
@@ -252,7 +281,7 @@ const ProductDetail = () => {
                         <ClipboardList className="h-5 w-5 text-muted-foreground" />
                         <div>
                           <p className="text-sm font-medium">Shelf Life</p>
-                          <p className="text-sm text-muted-foreground">{product.shelf_life}</p>
+                          <p className="text-sm text-muted-foreground">{product.shelf_life || "Not specified"}</p>
                         </div>
                       </div>
                     </div>
@@ -313,23 +342,25 @@ const ProductDetail = () => {
             <CardContent>
               <div className="flex items-center space-x-4 mb-4">
                 <Avatar className="h-12 w-12">
-                  <AvatarImage src={product.profiles?.image} alt={product.profiles?.name} />
+                  <AvatarImage src={product.farmer?.avatar_url} />
                   <AvatarFallback>
-                    {product.profiles?.name?.split(' ').map(n => n[0]).join('')}
+                    {product.farmer?.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <div className="font-medium">{product.profiles?.name}</div>
+                  <div className="font-medium">{product.farmer?.name}</div>
                   <div className="text-sm text-muted-foreground">{product.location}</div>
                 </div>
               </div>
               
               <div className="space-y-3">
                 <div className="text-sm font-medium">Contact Information</div>
-                <Button variant="outline" className="w-full" onClick={() => {}}>
-                  <MessageCircle className="mr-2 h-4 w-4" />
-                  Message Seller
-                </Button>
+                {!isProductOwner && (
+                  <Button variant="outline" className="w-full" onClick={() => {}}>
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Contact Seller
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -344,7 +375,7 @@ const ProductDetail = () => {
                 <div>
                   <div className="text-sm font-medium">Shipping Available</div>
                   <div className="text-sm text-muted-foreground">
-                    The seller provides shipping across Punjab, Haryana, and Delhi NCR.
+                    {product.shipping_availability || "Contact seller for shipping information."}
                   </div>
                 </div>
               </div>
@@ -354,7 +385,7 @@ const ProductDetail = () => {
                 <div>
                   <div className="text-sm font-medium">Shipping Policy</div>
                   <div className="text-sm text-muted-foreground">
-                    Shipping costs vary by location. Delivery typically takes 2-5 business days after order confirmation.
+                    {product.shipping_policy || "Contact seller for shipping policy details."}
                   </div>
                 </div>
               </div>

@@ -1,9 +1,8 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -22,53 +21,154 @@ import {
   Clock,
   MapPin,
   Download,
-  Phone
+  Phone,
+  Loader2
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const ShipmentDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [shipment, setShipment] = useState<any>(null);
   const [userRole, setUserRole] = useState<"farmer" | "trader">("farmer");
-  
-  // In a real app, we would fetch the shipment data based on the ID
-  const shipment = {
-    id: id || "SHP123456",
-    orderRef: "ORD123456",
-    date: new Date(2025, 3, 5),
-    customer: { name: "Vikram Sharma", avatar: "", initials: "VS", phone: "+91 98765 43210" },
-    seller: { name: "Rajesh Kumar", avatar: "", initials: "RK", phone: "+91 98765 12345" },
-    products: [
-      { name: "Organic Wheat", quantity: "20", price: "₹2,200/Quintal" }
-    ],
-    deliveryAddress: "123, Green Valley Farms, Sector 14, Gurugram, Haryana - 122001",
-    expectedDelivery: "April 15, 2025",
-    actualDelivery: null,
-    status: "in-transit" as "pending" | "processing" | "in-transit" | "delivered" | "cancelled",
-    trackingNumber: "TRK789654321",
-    carrier: "AgriExpress Logistics",
-    currentLocation: "Delhi Distribution Center",
-    lastUpdated: "April 8, 2025, 10:30 AM",
-    notes: "Please deliver during daytime hours only."
-  };
+  const { profile } = useAuth();
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [updateNote, setUpdateNote] = useState("");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  useEffect(() => {
+    const fetchShipment = async () => {
+      if (!id || !profile?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('shipments')
+          .select(`
+            *,
+            orders (
+              *,
+              products (
+                name,
+                unit
+              ),
+              farmer:farmer_id (
+                id,
+                name,
+                phone
+              ),
+              trader:trader_id (
+                id,
+                name,
+                phone
+              )
+            )
+          `)
+          .eq('id', id)
+          .single();
+          
+        if (error) throw error;
+        
+        if (!data) {
+          toast({
+            title: "Error",
+            description: "Shipment not found",
+            variant: "destructive"
+          });
+          navigate(shipmentsPath);
+          return;
+        }
+        
+        setShipment(data);
+      } catch (error) {
+        console.error('Error fetching shipment:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load shipment details",
+          variant: "destructive"
+        });
+        navigate(shipmentsPath);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchShipment();
+  }, [id, profile?.id, navigate, toast]);
 
   // Set user role based on URL path
-  useState(() => {
-    const path = window.location.pathname;
-    if (path.includes("farmer")) {
+  useEffect(() => {
+    if (window.location.pathname.includes("farmer")) {
       setUserRole("farmer");
     } else {
       setUserRole("trader");
     }
-  });
+  }, []);
+
+  if (loading) {
+    return (
+      <DashboardLayout userRole={userRole}>
+        <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!shipment) {
+    return null;
+  }
+
+  const shipmentsPath = userRole === "farmer" ? "/farmer-shipments" : "/trader-shipments";
+  const counterparty = userRole === "farmer" ? shipment.orders.trader : shipment.orders.farmer;
   
-  const handleMarkAsDelivered = () => {
-    toast({
-      title: "Shipment Delivered",
-      description: "Shipment #" + shipment.id + " has been marked as delivered.",
-    });
-    
-    // In a real app, we would make API call here
+  const handleMarkAsDelivered = async () => {
+    if (!shipment || !updateNote.trim()) return;
+
+    setUpdatingStatus(true);
+    try {
+      const { error } = await supabase
+        .from('shipments')
+        .update({
+          status: 'delivered',
+          delivered_at: new Date().toISOString(),
+          delivery_notes: updateNote.trim()
+        })
+        .eq('id', shipment.id);
+
+      if (error) throw error;
+
+      setShipment({
+        ...shipment,
+        status: 'delivered',
+        delivered_at: new Date().toISOString(),
+        delivery_notes: updateNote.trim()
+      });
+
+      setShowUpdateDialog(false);
+      setUpdateNote("");
+
+      toast({
+        title: "Success",
+        description: "Shipment marked as delivered"
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: "Failed to update shipment status",
+        variant: "destructive"
+      });
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
   
   const getStatusColor = (status: string) => {
@@ -105,9 +205,7 @@ const ShipmentDetail = () => {
     }
   };
   
-  const shipmentsPath = userRole === "farmer" ? "/farmer-shipments" : "/trader-shipments";
   const userName = userRole === "farmer" ? "Rajesh Kumar" : "Vikram Sharma";
-  const counterparty = userRole === "farmer" ? shipment.customer : shipment.seller;
   
   return (
     <DashboardLayout userRole={userRole}>
@@ -123,7 +221,8 @@ const ShipmentDetail = () => {
         
         <DashboardHeader 
           title="Shipment Details" 
-          userName={userName} 
+          userName={profile?.name || "User"}
+          userRole={userRole}
         />
       </div>
       
@@ -275,7 +374,7 @@ const ShipmentDetail = () => {
                         </div>
                       </div>
                       <div className="p-4 space-y-4">
-                        {shipment.products.map((product, index) => (
+                        {shipment.orders.products.map((product, index) => (
                           <div key={index} className="grid grid-cols-12 items-center">
                             <div className="col-span-6">
                               <div className="flex items-center">
@@ -288,7 +387,7 @@ const ShipmentDetail = () => {
                               </div>
                             </div>
                             <div className="col-span-3 text-center">{product.quantity}</div>
-                            <div className="col-span-3 text-right">{product.price}</div>
+                            <div className="col-span-3 text-right">{product.unit}</div>
                           </div>
                         ))}
                       </div>
@@ -369,10 +468,55 @@ const ShipmentDetail = () => {
             </CardContent>
             <CardFooter className="flex justify-between border-t pt-6">
               {userRole === "trader" && shipment.status === "in-transit" && (
-                <Button onClick={handleMarkAsDelivered}>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Confirm Delivery
-                </Button>
+                <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-agri-trader">
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Confirm Delivery
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Mark Shipment as Delivered</DialogTitle>
+                      <DialogDescription>
+                        Please provide any delivery notes or comments before marking this shipment as delivered.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="notes">Delivery Notes</Label>
+                        <Textarea
+                          id="notes"
+                          placeholder="Enter any delivery notes or comments..."
+                          value={updateNote}
+                          onChange={(e) => setUpdateNote(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowUpdateDialog(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleMarkAsDelivered}
+                        disabled={!updateNote.trim() || updatingStatus}
+                        className="bg-agri-trader"
+                      >
+                        {updatingStatus ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          'Confirm Delivery'
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               )}
               
               <Button variant="outline">

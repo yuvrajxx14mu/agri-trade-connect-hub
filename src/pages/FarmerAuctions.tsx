@@ -40,45 +40,41 @@ const FarmerAuctions = () => {
       if (!profile?.id) return;
 
       try {
-        // Fetch products that are in auction by joining with auctions table
-        const { data: auctionProducts, error } = await supabase
+        // First fetch the auctions
+        const { data: auctions, error: auctionsError } = await supabase
           .from('auctions')
-          .select(`
-            id,
-            product_id,
-            start_price,
-            current_price,
-            min_increment,
-            start_time,
-            end_time,
-            status,
-            products (
-              id,
-              name,
-              quantity,
-              unit,
-              price
-            )
-          `)
+          .select('*')
           .eq('farmer_id', profile.id)
           .eq('status', 'active');
 
-        if (error) throw error;
+        if (auctionsError) throw auctionsError;
 
-        // Transform the data to match the expected format
-        const transformedAuctions = (auctionProducts || []).map(auction => ({
-          id: auction.product_id,
-          product: {
-            name: auction.products.name,
-            quantity: auction.products.quantity,
-            unit: auction.products.unit,
-            price: auction.products.price
-          },
-          currentBid: auction.current_price || auction.start_price,
-          bidCount: 0, // We'll need to fetch this separately if needed
-          endsIn: getTimeRemaining(new Date(auction.end_time)),
-          status: auction.status
-        }));
+        // Then fetch the products for these auctions
+        const productIds = auctions?.map(a => a.product_id) || [];
+        const { data: products, error: productsError } = await supabase
+          .from('products')
+          .select('*')
+          .in('id', productIds);
+
+        if (productsError) throw productsError;
+
+        // Combine the data
+        const transformedAuctions = (auctions || []).map(auction => {
+          const product = products?.find(p => p.id === auction.product_id);
+          return {
+            id: auction.id,
+            product: {
+              name: product?.name || '',
+              quantity: product?.quantity || 0,
+              unit: product?.unit || '',
+              price: product?.price || 0
+            },
+            currentBid: auction.current_price || auction.start_price,
+            bidCount: 0, // We'll need to fetch this separately if needed
+            endsIn: getTimeRemaining(new Date(auction.end_time)),
+            status: auction.status
+          };
+        });
 
         setAuctions(transformedAuctions);
         setIsLoading(false);

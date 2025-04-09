@@ -1,103 +1,141 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NotificationItem from "@/components/NotificationItem";
-import { Bell, CheckSquare, Trash2 } from "lucide-react";
-
-const notifications = [
-  {
-    id: "n1",
-    title: "New Auction Available",
-    message: "Rajesh Kumar has listed 20 Quintals of Organic Wheat for auction.",
-    time: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
-    type: "auction" as const,
-    read: false
-  },
-  {
-    id: "n2",
-    title: "Bid Update",
-    message: "Your bid for Premium Rice has been outbid by another trader.",
-    time: new Date(Date.now() - 35 * 60 * 1000), // 35 minutes ago
-    type: "bid" as const,
-    read: false
-  },
-  {
-    id: "n3",
-    title: "Auction Ending Soon",
-    message: "An auction for Yellow Lentils you're participating in ends in 2 hours.",
-    time: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
-    type: "auction" as const,
-    read: false
-  },
-  {
-    id: "n4",
-    title: "Order Confirmed",
-    message: "Your order #ORD123456 for Organic Wheat has been confirmed.",
-    time: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
-    type: "order" as const,
-    read: true
-  },
-  {
-    id: "n5",
-    title: "Shipment Update",
-    message: "Your order #ORD123457 has been shipped and is on the way.",
-    time: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-    type: "shipment" as const,
-    read: true
-  },
-  {
-    id: "n6",
-    title: "Price Alert",
-    message: "Prices for Rice have decreased by 5% in the last 24 hours.",
-    time: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-    type: "alert" as const,
-    read: true
-  },
-  {
-    id: "n7",
-    title: "Appointment Reminder",
-    message: "You have a product inspection meeting with Meena Patel tomorrow at 10:00 AM.",
-    time: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-    type: "appointment" as const,
-    read: true
-  }
-];
+import { Bell, CheckSquare, Trash2, Loader2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const TraderNotifications = () => {
+  const { profile } = useAuth();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("all");
-  const [notificationsList, setNotificationsList] = useState(notifications);
+  const [notificationsList, setNotificationsList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!profile?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', profile.id)
+          .order('created_at', { ascending: false });
+          
+        if (error) throw error;
+        
+        setNotificationsList(data || []);
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load notifications",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchNotifications();
+  }, [profile?.id, toast]);
   
   const filteredNotifications = notificationsList.filter(notification => {
     if (activeTab === "all") return true;
-    if (activeTab === "unread") return !notification.read;
+    if (activeTab === "unread") return !notification.is_read;
     return notification.type === activeTab;
   });
   
-  const markAllAsRead = () => {
-    setNotificationsList(notificationsList.map(notification => ({
-      ...notification,
-      read: true
-    })));
+  const markAllAsRead = async () => {
+    if (!profile?.id) return;
+    
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', profile.id)
+        .eq('is_read', false);
+        
+      if (error) throw error;
+      
+      setNotificationsList(notificationsList.map(notification => ({
+        ...notification,
+        is_read: true
+      })));
+      
+      toast({
+        title: "Success",
+        description: "All notifications marked as read"
+      });
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark notifications as read",
+        variant: "destructive"
+      });
+    }
   };
   
-  const markAsRead = (id: string) => {
-    setNotificationsList(notificationsList.map(notification => 
-      notification.id === id ? { ...notification, read: true } : notification
-    ));
+  const markAsRead = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', id);
+        
+      if (error) throw error;
+      
+      setNotificationsList(notificationsList.map(notification => 
+        notification.id === id ? { ...notification, is_read: true } : notification
+      ));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark notification as read",
+        variant: "destructive"
+      });
+    }
   };
   
-  const clearAllNotifications = () => {
-    setNotificationsList([]);
+  const clearAllNotifications = async () => {
+    if (!profile?.id) return;
+    
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', profile.id);
+        
+      if (error) throw error;
+      
+      setNotificationsList([]);
+      toast({
+        title: "Success",
+        description: "All notifications cleared"
+      });
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear notifications",
+        variant: "destructive"
+      });
+    }
   };
   
-  const unreadCount = notificationsList.filter(n => !n.read).length;
+  const unreadCount = notificationsList.filter(n => !n.is_read).length;
   
   return (
     <DashboardLayout userRole="trader">
-      <DashboardHeader title="Notifications" userName="Vikram Sharma" userRole="trader" />
+      <DashboardHeader title="Notifications" userName={profile?.name || "User"} userRole="trader" />
       
       <Card>
         <CardHeader className="flex flex-col sm:flex-row justify-between sm:items-center">
@@ -136,16 +174,21 @@ const TraderNotifications = () => {
             </TabsList>
             
             <div className="space-y-1">
-              {filteredNotifications.length > 0 ? (
+              {loading ? (
+                <div className="text-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                  <p className="text-muted-foreground">Loading notifications...</p>
+                </div>
+              ) : filteredNotifications.length > 0 ? (
                 filteredNotifications.map((notification) => (
                   <NotificationItem
                     key={notification.id}
                     id={notification.id}
                     title={notification.title}
                     message={notification.message}
-                    time={notification.time}
+                    time={new Date(notification.created_at)}
                     type={notification.type}
-                    read={notification.read}
+                    read={notification.is_read}
                     onClick={() => markAsRead(notification.id)}
                   />
                 ))

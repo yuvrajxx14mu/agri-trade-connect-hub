@@ -15,32 +15,67 @@ import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
+interface Bid {
+  id: string;
+  bidder_id: string;
+  amount: number;
+  created_at: string;
+}
+
+interface Profile {
+  id: string;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  role: string;
+}
+
 interface Auction {
   id: string;
   product_id: string;
   farmer_id: string;
   start_price: number;
   current_price: number;
+  reserve_price: number | null;
   min_increment: number;
+  quantity: number;
   start_time: string;
   end_time: string;
+  description: string | null;
+  auction_type: string;
+  allow_auto_bids: boolean;
+  visibility: string;
+  shipping_options: string;
   status: string;
   created_at: string;
   updated_at: string;
-  farmer: {
-    id: string;
-    name: string;
-    location: string;
-    rating: number;
-    verified: boolean;
-  };
-  bids: Array<{
-    id: string;
-    bidder_id: string;
-    amount: number;
-    created_at: string;
-  }>;
+  farmer_profile: Profile;
+  bids: Bid[];
 }
+
+type SupabaseAuctionResponse = {
+  id: string;
+  product_id: string;
+  farmer_id: string;
+  start_price: number;
+  current_price: number;
+  reserve_price: number | null;
+  min_increment: number;
+  quantity: number;
+  start_time: string;
+  end_time: string;
+  description: string | null;
+  auction_type: string;
+  allow_auto_bids: boolean;
+  visibility: string;
+  shipping_options: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  farmer_profile: Profile;
+};
 
 const AuctionPage = () => {
   const { id } = useParams();
@@ -56,19 +91,49 @@ const AuctionPage = () => {
   useEffect(() => {
     const fetchAuction = async () => {
       try {
-        const { data, error } = await supabase
+        // First fetch the auction details
+        const { data: auctionData, error: auctionError } = await supabase
           .from('auctions')
           .select(`
             *,
-            farmer:profiles(*),
-            bids(*)
+            farmer_profile:profiles!inner(
+              id,
+              name,
+              phone,
+              address,
+              city,
+              state,
+              role
+            )
           `)
           .eq('id', id)
           .single();
 
-        if (error) throw error;
-        setAuction(data);
-      } catch (err) {
+        if (auctionError) throw auctionError;
+
+        if (auctionData) {
+          const typedAuctionData = auctionData as SupabaseAuctionResponse;
+          
+          // Then fetch the bids separately
+          const { data: bidsData, error: bidsError } = await supabase
+            .from('bids')
+            .select('id, bidder_id, amount, created_at')
+            .eq('product_id', typedAuctionData.product_id)
+            .order('amount', { ascending: false });
+
+          if (bidsError) {
+            console.error('Error fetching bids:', bidsError);
+          }
+
+          // Transform the data to match our interface
+          const transformedAuction: Auction = {
+            ...typedAuctionData,
+            bids: (bidsData || []) as Bid[]
+          };
+          
+          setAuction(transformedAuction);
+        }
+      } catch (err: any) {
         setError(err.message);
       } finally {
         setLoading(false);
@@ -133,8 +198,9 @@ const AuctionPage = () => {
       const { error } = await supabase
         .from('bids')
         .insert({
-          auction_id: auction.id,
+          product_id: auction.product_id,
           bidder_id: profile?.id,
+          bidder_name: profile?.name || '',
           amount: parseFloat(bidAmount)
         });
 
@@ -153,22 +219,30 @@ const AuctionPage = () => {
         .from('auctions')
         .select(`
           *,
-          farmer:profiles(*),
+          farmer_profile:profiles!inner(
+            id,
+            name,
+            phone,
+            address,
+            city,
+            state,
+            role
+          ),
           bids(*)
         `)
         .eq('id', id)
         .single();
 
       if (fetchError) throw fetchError;
-      setAuction(data);
+      setAuction(data as Auction);
       
       toast({
         title: "Bid Placed Successfully!",
-        description: `You've placed a bid of ₹${bidAmount}/Quintal`,
+        description: `You've placed a bid of ₹${parseFloat(bidAmount).toLocaleString()}`
       });
-      
       setBidAmount("");
     } catch (err) {
+      console.error('Error placing bid:', err);
       toast({
         title: "Error",
         description: "Failed to place bid. Please try again.",
@@ -214,7 +288,7 @@ const AuctionPage = () => {
                       </div>
                       <div className="flex items-center">
                         <MapPin className="mr-1 h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">{auction.farmer.location}</span>
+                        <span className="text-sm text-muted-foreground">{auction.farmer_profile.city}, {auction.farmer_profile.state}</span>
                       </div>
                     </div>
                   </CardDescription>
@@ -268,19 +342,16 @@ const AuctionPage = () => {
                 <h3 className="font-medium mb-3">About the Seller</h3>
                 <div className="flex items-center space-x-4">
                   <Avatar className="h-10 w-10">
-                    <AvatarFallback>{auction.farmer.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback>{auction.farmer_profile.name.slice(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div>
                     <div className="flex items-center">
-                      <p className="font-medium">{auction.farmer.name}</p>
-                      {auction.farmer.verified && (
-                        <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
-                          <UserCheck className="mr-1 h-3 w-3" />
-                          Verified
-                        </Badge>
-                      )}
+                      <p className="font-medium">{auction.farmer_profile.name}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground">Rating: {auction.farmer.rating}/5</p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      <span>{auction.farmer_profile.city}, {auction.farmer_profile.state}</span>
+                    </div>
                   </div>
                 </div>
               </div>

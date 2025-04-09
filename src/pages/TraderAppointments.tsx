@@ -140,7 +140,7 @@ const TraderAppointments = () => {
 
   return (
     <DashboardLayout userRole="trader">
-      <DashboardHeader title="Appointments" userName="Vikram Sharma" />
+      <DashboardHeader title="Appointments" userName={profile?.name || "User"} userRole="trader" />
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">

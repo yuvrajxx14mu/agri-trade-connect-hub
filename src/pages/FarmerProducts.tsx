@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -24,6 +23,7 @@ interface Product {
   status: string;
   price: number;
   location: string;
+  auction_id?: string;
 }
 
 const FarmerProducts = () => {
@@ -189,13 +189,13 @@ const FarmerProducts = () => {
                           className={
                             product.status === "sold" 
                               ? "bg-green-50 text-green-700 border-green-200" 
-                              : product.status === "auction" 
+                              : product.status === "inactive" && product.auction_id
                               ? "bg-blue-50 text-blue-700 border-blue-200"
                               : "bg-yellow-50 text-yellow-700 border-yellow-200"
                           }
                         >
                           {product.status === "active" ? "Listed" : 
-                           product.status === "auction" ? "In Auction" : 
+                           product.status === "inactive" && product.auction_id ? "In Auction" : 
                            product.status.charAt(0).toUpperCase() + product.status.slice(1)}
                         </Badge>
                       </TableCell>
