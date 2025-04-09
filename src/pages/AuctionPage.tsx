@@ -80,6 +80,7 @@ const AuctionPage = () => {
 
         if (auctionData) {
           // Then fetch the farmer profile separately
+          let farmerProfile: Profile;
           const { data: farmerData, error: farmerError } = await supabase
             .from('profiles')
             .select('id, name, phone, address, city, state, role')
@@ -89,7 +90,7 @@ const AuctionPage = () => {
           if (farmerError) {
             console.error('Error fetching farmer profile:', farmerError);
             // Create a minimal default profile
-            farmerData = {
+            farmerProfile = {
               id: auctionData.farmer_id,
               name: "Unknown Farmer",
               phone: null,
@@ -98,6 +99,8 @@ const AuctionPage = () => {
               state: "Unknown",
               role: "farmer"
             };
+          } else {
+            farmerProfile = farmerData as Profile;
           }
 
           // Then fetch the bids separately
@@ -114,7 +117,7 @@ const AuctionPage = () => {
           // Create properly typed auction object
           const transformedAuction: Auction = {
             ...auctionData,
-            farmer_profile: farmerData as Profile,
+            farmer_profile: farmerProfile,
             bids: (bidsData || []) as Bid[]
           };
           
@@ -211,11 +214,28 @@ const AuctionPage = () => {
       if (refreshError) throw refreshError;
 
       // Get updated farmer profile
+      let farmerProfile: Profile;
       const { data: farmerData, error: farmerError } = await supabase
         .from('profiles')
         .select('id, name, phone, address, city, state, role')
         .eq('id', refreshedAuction.farmer_id)
         .single();
+
+      if (farmerError) {
+        console.error('Error fetching farmer profile:', farmerError);
+        // Create default profile if error
+        farmerProfile = {
+          id: refreshedAuction.farmer_id,
+          name: "Unknown Farmer",
+          phone: null,
+          address: null,
+          city: "Unknown",
+          state: "Unknown",
+          role: "farmer"
+        };
+      } else {
+        farmerProfile = farmerData as Profile;
+      }
 
       // Get updated bids
       const { data: refreshedBids, error: bidsError } = await supabase
@@ -227,7 +247,7 @@ const AuctionPage = () => {
       // Update the state with properly typed data
       setAuction({
         ...refreshedAuction,
-        farmer_profile: farmerData as Profile,
+        farmer_profile: farmerProfile,
         bids: (refreshedBids || []) as Bid[]
       });
       
