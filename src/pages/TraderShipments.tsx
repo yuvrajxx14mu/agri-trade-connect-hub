@@ -37,22 +37,27 @@ const TraderShipments = () => {
 
         if (error) throw error;
 
-        // Transform the data to match the expected format
-        const transformedShipments = data.map(shipment => ({
-          id: shipment.id,
-          orderId: shipment.order.id,
-          trackingNumber: shipment.tracking_number,
-          items: shipment.items.map(item => ({
-            name: item.product_name,
-            quantity: item.quantity
-          })),
-          status: shipment.status,
-          dispatchDate: new Date(shipment.dispatch_date),
-          estimatedDelivery: new Date(shipment.estimated_delivery),
-          currentLocation: shipment.current_location,
-          destination: shipment.destination,
-          progress: shipment.progress
-        }));
+        const transformedShipments = data.map(shipment => {
+          const progressValue = getShipmentProgress(shipment.status);
+          
+          return {
+            id: shipment.id,
+            orderId: shipment.order?.id || 'Unknown',
+            trackingNumber: shipment.tracking_number,
+            items: Array.isArray(shipment.items) 
+              ? shipment.items.map(item => ({
+                  name: item.product_name || 'Unknown product',
+                  quantity: item.quantity || 0
+                }))
+              : [],
+            status: shipment.status,
+            dispatchDate: shipment.dispatch_date ? new Date(shipment.dispatch_date) : null,
+            estimatedDelivery: shipment.estimated_delivery ? new Date(shipment.estimated_delivery) : null,
+            currentLocation: shipment.current_location || 'Unknown',
+            destination: shipment.destination || "Trader's Warehouse",
+            progress: progressValue
+          };
+        });
 
         setShipments(transformedShipments);
       } catch (err) {
@@ -67,19 +72,29 @@ const TraderShipments = () => {
     }
   }, [profile?.id]);
   
+  const getShipmentProgress = (status: string): number => {
+    switch (status) {
+      case "processing": return 0;
+      case "packed": return 20;
+      case "shipped": return 40;
+      case "in_transit": return 60;
+      case "out_for_delivery": return 80;
+      case "delivered": return 100;
+      case "cancelled": return 0;
+      default: return 0;
+    }
+  };
+  
   const getFilteredShipments = () => {
     return shipments.filter(shipment => {
-      // Filter by search term
       const matchesSearch = 
         shipment.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         shipment.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
         shipment.trackingNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         shipment.items.some(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
       
-      // Filter by status
       const matchesStatus = statusFilter === "all" || shipment.status === statusFilter;
       
-      // Filter by tab
       const matchesTab = 
         (activeTab === "active" && ["processing", "packed", "shipped", "in_transit", "out_for_delivery"].includes(shipment.status)) ||
         (activeTab === "completed" && ["delivered", "cancelled"].includes(shipment.status));

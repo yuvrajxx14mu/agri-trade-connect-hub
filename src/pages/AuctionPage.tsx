@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -123,9 +124,10 @@ const AuctionPage = () => {
             console.error('Error fetching bids:', bidsError);
           }
 
-          // Transform the data to match our interface
+          // Fix the type casting issue by creating a properly typed object
           const transformedAuction: Auction = {
-            ...auctionData as unknown as SupabaseAuctionResponse,
+            ...auctionData,
+            farmer_profile: auctionData.farmer_profile as Profile,
             bids: (bidsData || []) as Bid[]
           };
           
@@ -232,7 +234,13 @@ const AuctionPage = () => {
         .single();
 
       if (fetchError) throw fetchError;
-      setAuction(data as Auction);
+      
+      // Fix type casting here too
+      setAuction({
+        ...data,
+        farmer_profile: data.farmer_profile as Profile,
+        bids: data.bids as Bid[]
+      } as Auction);
       
       toast({
         title: "Bid Placed Successfully!",

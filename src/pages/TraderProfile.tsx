@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { User, MapPin, Phone, Mail, Shield, Bell, Key, Upload, Calendar, Building2 } from "lucide-react";
-import { useAuth } from "@/context/auth";
+import { useAuth } from "@/context/AuthContext";
 
 const TraderProfile = () => {
   const { profile: userProfile } = useAuth();

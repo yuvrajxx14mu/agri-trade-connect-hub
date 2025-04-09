@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -39,6 +40,7 @@ const FarmerProfile = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(false);
+  const [isEditingFarm, setIsEditingFarm] = useState(false);
   const [personalInfo, setPersonalInfo] = useState({
     firstName: "",
     lastName: "",
@@ -107,7 +109,7 @@ const FarmerProfile = () => {
               .from('notification_settings')
               .insert({
                 user_id: profile.id,
-                settings: notificationSettings
+                settings: JSON.stringify(notificationSettings)
               });
             
             if (insertError) throw insertError;
@@ -115,7 +117,16 @@ const FarmerProfile = () => {
             throw error;
           }
         } else if (data) {
-          setNotificationSettings(data.settings);
+          // Parse the JSON data safely
+          try {
+            const parsedSettings = typeof data.settings === 'string' 
+              ? JSON.parse(data.settings) 
+              : data.settings;
+            
+            setNotificationSettings(parsedSettings as NotificationSettings);
+          } catch (parseError) {
+            console.error('Error parsing notification settings:', parseError);
+          }
         }
       } catch (err) {
         console.error('Error fetching notification settings:', err);
@@ -229,7 +240,7 @@ const FarmerProfile = () => {
       const { error } = await supabase
         .from('notification_settings')
         .update({
-          settings: updatedSettings
+          settings: JSON.stringify(updatedSettings)
         })
         .eq('user_id', profile.id);
       
@@ -244,12 +255,12 @@ const FarmerProfile = () => {
     }
   };
   
-  const handleSaveNotificationSettings = async (settings) => {
+  const handleSaveNotificationSettings = async (settings: NotificationSettings) => {
     try {
       const { error } = await supabase
         .from('notification_settings')
         .upsert({
-          user_id: profile.id,
+          user_id: profile?.id,
           settings: JSON.stringify(settings)
         });
       
