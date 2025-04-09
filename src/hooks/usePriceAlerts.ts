@@ -27,15 +27,26 @@ export const usePriceAlerts = () => {
     try {
       setLoading(true);
       
+      // Use direct SQL query via RPC if complex query needed
       const { data, error: fetchError } = await supabase
-        .from('price_alerts')
-        .select('*')
-        .eq('user_id', profile.id)
+        .rpc('get_user_price_alerts', { user_id: profile.id })
         .order('created_at', { ascending: false });
       
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        // Fallback to standard query
+        const { data: standardData, error: standardError } = await supabase
+          .from('price_alerts')
+          .select('*')
+          .eq('user_id', profile.id)
+          .order('created_at', { ascending: false });
+        
+        if (standardError) throw standardError;
+        
+        setAlerts(standardData as PriceAlert[]);
+      } else {
+        setAlerts(data as PriceAlert[]);
+      }
       
-      setAlerts(data || []);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching price alerts:', err);
@@ -50,7 +61,8 @@ export const usePriceAlerts = () => {
     try {
       const newAlert = {
         ...alert,
-        user_id: profile.id
+        user_id: profile.id,
+        status: alert.status || 'active'
       };
       
       const { data, error: createError } = await supabase
@@ -60,8 +72,8 @@ export const usePriceAlerts = () => {
       
       if (createError) throw createError;
       
-      if (data) {
-        setAlerts(prev => [data[0], ...prev]);
+      if (data && data.length > 0) {
+        setAlerts(prev => [data[0] as PriceAlert, ...prev]);
         
         toast({
           title: "Alert Created",
@@ -69,7 +81,7 @@ export const usePriceAlerts = () => {
           variant: "default"
         });
         
-        return data[0];
+        return data[0] as PriceAlert;
       }
       
       return null;

@@ -1,697 +1,616 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
+import { User, Truck, Calendar, DollarSign, Package, Clock, CheckCircle2, XCircle, Download, ArrowLeft } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-
-import {
-  Package,
-  Truck,
-  Clock,
-  CheckCircle,
-  FileClock,
-  Calendar,
-  CalendarCheck,
-  FileText,
-  ArrowLeft,
-  XCircle,
-  ShoppingBag,
-  MessageCircle,
-  ExternalLink,
-  Download,
-  AlertCircle
-} from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
-type OrderStatus = "pending" | "confirmed" | "shipped" | "delivered" | "cancelled" | "completed";
-type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "pending":
+      return "bg-yellow-50 text-yellow-700 border-yellow-200";
+    case "processing":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "completed":
+      return "bg-green-50 text-green-700 border-green-200";
+    case "cancelled":
+      return "bg-red-50 text-red-700 border-red-200";
+    default:
+      return "bg-gray-50 text-gray-700 border-gray-200";
+  }
+};
 
-interface OrderType {
-  id: string;
-  created_at: string;
-  status: OrderStatus;
-  payment_status: PaymentStatus;
-  farmer_id: string;
-  trader_id: string;
-  product_id: string;
-  quantity: number;
-  price: number;
-  total_amount: number;
-  payment_date: string | null;
-  delivery_date: string | null;
-  notes: string | null;
-}
-
-interface ProductType {
-  name: string;
-  category: string;
-  unit: string;
-  location: string;
-  image_url: string | null;
-}
-
-interface ProfileType {
-  name: string;
-  phone: string | null;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-}
-
-// Define a type for notifications since it's not in the generated types
-interface Notification {
-  user_id: string;
-  title: string;
-  message: string;
-  type: string;
-  related_id?: string;
-}
+const getPaymentStatusColor = (status: string) => {
+  switch (status) {
+    case "pending":
+      return "bg-yellow-50 text-yellow-700 border-yellow-200";
+    case "processing":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "completed":
+      return "bg-green-50 text-green-700 border-green-200";
+    default:
+      return "bg-gray-50 text-gray-700 border-gray-200";
+  }
+};
 
 const OrderDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { profile } = useAuth();
-  
-  const [order, setOrder] = useState<OrderType | null>(null);
-  const [product, setProduct] = useState<ProductType | null>(null);
-  const [counterpartyProfile, setCounterpartyProfile] = useState<ProfileType | null>(null);
-  const [newStatus, setNewStatus] = useState<OrderStatus | "">("");
-  const [newNote, setNewNote] = useState("");
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+  const [order, setOrder] = useState<any>(null);
+  const [shipment, setShipment] = useState<any>(null);
+  const [otherParty, setOtherParty] = useState<any>(null);
   
-  const userRole = profile?.role || "farmer";
-  
+  const userRole = profile?.role === "farmer" || profile?.role === "trader" 
+    ? profile.role 
+    : "farmer" as const;
+
   useEffect(() => {
     const fetchOrderDetails = async () => {
       if (!id || !profile?.id) return;
       
       try {
-        // Fetch order
+        setLoading(true);
+        
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
-          .select('*')
+          .select(`
+            *,
+            product:product_id (
+              name,
+              category,
+              description,
+              unit,
+              quality,
+              location,
+              image_url
+            ),
+            farmer:farmer_id (
+              id,
+              name,
+              phone,
+              address,
+              city,
+              state,
+              pincode
+            ),
+            trader:trader_id (
+              id,
+              name,
+              phone,
+              address,
+              city,
+              state,
+              pincode
+            )
+          `)
           .eq('id', id)
           .single();
-          
+        
         if (orderError) throw orderError;
         
-        // Check if user is authorized to view this order
-        if (userRole === 'farmer' && orderData.farmer_id !== profile.id) {
-          navigate(`/${userRole}-orders`);
-          return;
+        setOrder(orderData);
+        
+        if (userRole === 'farmer') {
+          setOtherParty(orderData.trader);
+        } else {
+          setOtherParty(orderData.farmer);
         }
         
-        if (userRole === 'trader' && orderData.trader_id !== profile.id) {
-          navigate(`/${userRole}-orders`);
-          return;
-        }
+        const { data: shipmentData, error: shipmentError } = await supabase
+          .from('shipments')
+          .select('*')
+          .eq('order_id', id)
+          .maybeSingle();
         
-        setOrder(orderData as OrderType);
-        // Use type assertion to ensure proper typing
-        setNewStatus(orderData.status as OrderStatus);
+        if (shipmentError) throw shipmentError;
         
-        // Fetch product
-        const { data: productData, error: productError } = await supabase
-          .from('products')
-          .select('name, category, unit, location, image_url')
-          .eq('id', orderData.product_id)
-          .single();
-          
-        if (productError) throw productError;
-        setProduct(productData as ProductType);
-        
-        // Fetch counterparty profile
-        const counterpartyId = userRole === 'farmer' ? orderData.trader_id : orderData.farmer_id;
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('name, phone, address, city, state')
-          .eq('id', counterpartyId)
-          .single();
-          
-        if (profileError) throw profileError;
-        setCounterpartyProfile(profileData as ProfileType);
-        
+        setShipment(shipmentData);
+        setLoading(false);
       } catch (error) {
         console.error('Error fetching order details:', error);
         toast({
           title: "Error",
-          description: "Could not load order details",
+          description: "Failed to load order details",
           variant: "destructive"
         });
-      } finally {
         setLoading(false);
       }
     };
     
     fetchOrderDetails();
-  }, [id, profile?.id, userRole, navigate, toast]);
-  
-  const handleStatusUpdate = async () => {
-    if (!order || !newStatus) return;
-    
-    setUpdating(true);
+  }, [id, profile?.id, toast, userRole]);
+
+  const handleUpdateOrderStatus = async (newStatus: string) => {
+    if (!id || !profile?.id) return;
     
     try {
       const { error } = await supabase
         .from('orders')
         .update({ status: newStatus })
-        .eq('id', order.id);
-        
+        .eq('id', id);
+      
       if (error) throw error;
       
-      // Create notification for counterparty
-      // Since notifications table was just created, we need to handle it properly
-      const counterpartyId = userRole === 'farmer' ? order.trader_id : order.farmer_id;
-      
-      try {
-        // Use type assertion for the notifications table
-        const notification: Notification = {
-          user_id: counterpartyId,
-          title: "Order Status Updated",
-          message: `Order #${order.id.slice(0, 8)} has been updated to ${newStatus}`,
-          type: "order",
-          related_id: order.id
-        };
-        
-        // Use type assertion to bypass type checking for the table name
-        await (supabase.from('notifications' as any).insert(notification as any));
-      } catch (notifError) {
-        console.error("Error creating notification:", notifError);
-        // Continue with order update even if notification fails
-      }
-      
-      // Update local state
-      setOrder({
-        ...order,
-        status: newStatus as OrderStatus
-      });
+      setOrder({ ...order, status: newStatus });
       
       toast({
-        title: "Status Updated",
-        description: `Order status has been updated to ${newStatus}`
+        title: "Success",
+        description: `Order status updated to ${newStatus}`,
+        variant: "default"
       });
       
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: userRole === 'farmer' ? order.trader_id : order.farmer_id,
+          title: "Order Status Updated",
+          message: `Order #${id.slice(0, 8)} status has been updated to ${newStatus}`,
+          type: "order_update",
+          read: false
+        });
+        
     } catch (error) {
       console.error('Error updating order status:', error);
       toast({
-        title: "Update Failed",
+        title: "Error",
         description: "Failed to update order status",
         variant: "destructive"
       });
-    } finally {
-      setUpdating(false);
     }
   };
-  
-  const handleAddNote = async () => {
-    if (!order || !newNote.trim()) return;
-    
-    setUpdating(true);
+
+  const handleUpdatePaymentStatus = async (newStatus: string) => {
+    if (!id || !profile?.id || userRole !== 'trader') return;
     
     try {
-      // Update the order with the new note
       const { error } = await supabase
         .from('orders')
-        .update({ notes: newNote })
-        .eq('id', order.id);
-        
+        .update({ 
+          payment_status: newStatus,
+          payment_date: newStatus === 'completed' ? new Date().toISOString() : order.payment_date
+        })
+        .eq('id', id);
+      
       if (error) throw error;
       
-      // Update local state
-      setOrder({
-        ...order,
-        notes: newNote
+      setOrder({ 
+        ...order, 
+        payment_status: newStatus,
+        payment_date: newStatus === 'completed' ? new Date().toISOString() : order.payment_date
       });
-      
-      // Reset the input
-      setNewNote("");
       
       toast({
-        title: "Note Added",
-        description: "Your note has been added to the order"
+        title: "Success",
+        description: `Payment status updated to ${newStatus}`,
+        variant: "default"
       });
       
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: order.farmer_id,
+          title: "Payment Status Updated",
+          message: `Payment for Order #${id.slice(0, 8)} has been updated to ${newStatus}`,
+          type: "payment_update",
+          read: false
+        });
+        
     } catch (error) {
-      console.error('Error adding note:', error);
+      console.error('Error updating payment status:', error);
       toast({
-        title: "Failed to Add Note",
-        description: "There was an error adding your note",
+        title: "Error",
+        description: "Failed to update payment status",
         variant: "destructive"
       });
-    } finally {
-      setUpdating(false);
     }
   };
-  
-  const getStatusBadge = (status: OrderStatus) => {
-    const statusColors = {
-      pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
-      confirmed: "bg-blue-50 text-blue-700 border-blue-200",
-      processing: "bg-blue-50 text-blue-700 border-blue-200",
-      shipped: "bg-purple-50 text-purple-700 border-purple-200",
-      delivered: "bg-green-50 text-green-700 border-green-200",
-      completed: "bg-green-50 text-green-700 border-green-200",
-      cancelled: "bg-red-50 text-red-700 border-red-200"
-    };
-    
-    const statusIcons = {
-      pending: <Clock className="h-4 w-4 mr-1" />,
-      confirmed: <CheckCircle className="h-4 w-4 mr-1" />,
-      processing: <FileClock className="h-4 w-4 mr-1" />,
-      shipped: <Truck className="h-4 w-4 mr-1" />,
-      delivered: <CheckCircle className="h-4 w-4 mr-1" />,
-      completed: <CheckCircle className="h-4 w-4 mr-1" />,
-      cancelled: <XCircle className="h-4 w-4 mr-1" />
-    };
-    
-    return (
-      <Badge variant="outline" className={statusColors[status]}>
-        <span className="flex items-center">
-          {statusIcons[status]}
-          {status.charAt(0).toUpperCase() + status.slice(1)}
-        </span>
-      </Badge>
-    );
+
+  const handleDownloadInvoice = () => {
+    toast({
+      title: "Feature Coming Soon",
+      description: "The invoice download functionality will be available soon",
+      variant: "default"
+    });
   };
-  
-  const getPaymentStatusBadge = (status: PaymentStatus) => {
-    const statusColors = {
-      pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
-      paid: "bg-green-50 text-green-700 border-green-200",
-      failed: "bg-red-50 text-red-700 border-red-200",
-      refunded: "bg-purple-50 text-purple-700 border-purple-200"
-    };
-    
-    return (
-      <Badge variant="outline" className={statusColors[status]}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
-  
-  const getAvailableStatuses = (): OrderStatus[] => {
-    if (!order) return [];
-    
-    if (userRole === "farmer") {
-      switch (order.status) {
-        case "pending":
-          return ["confirmed", "cancelled"];
-        case "confirmed":
-          return ["shipped", "cancelled"];
-        case "shipped":
-          return ["delivered"];
-        default:
-          return [];
-      }
-    } else { // trader
-      switch (order.status) {
-        case "pending":
-          return ["cancelled"];
-        case "delivered":
-          return ["completed"];
-        default:
-          return [];
-      }
-    }
-  };
-  
-  const getStatusSelectItems = () => {
-    const statuses = getAvailableStatuses();
-    
-    return statuses.map((status) => (
-      <SelectItem key={status} value={status}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </SelectItem>
-    ));
-  };
-  
-  const canUpdateStatus = (): boolean => {
-    return getAvailableStatuses().length > 0;
-  };
-  
+
   if (loading) {
     return (
       <DashboardLayout userRole={userRole}>
-        <div className="flex justify-center items-center h-[80vh]">
-          <p>Loading order details...</p>
+        <DashboardHeader title="Order Details" userName={profile?.name || ""} userRole={userRole} />
+        <div className="flex items-center justify-center h-[400px]">
+          <Clock className="h-8 w-8 animate-spin text-primary" />
         </div>
       </DashboardLayout>
     );
   }
-  
-  if (!order || !product || !counterpartyProfile) {
+
+  if (!order) {
     return (
       <DashboardLayout userRole={userRole}>
-        <div className="flex justify-center items-center h-[80vh]">
-          <p>Order not found</p>
-        </div>
+        <DashboardHeader title="Order Details" userName={profile?.name || ""} userRole={userRole} />
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center h-[400px]">
+            <XCircle className="h-12 w-12 text-destructive mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Order Not Found</h2>
+            <p className="text-muted-foreground mb-4">The order you are looking for does not exist or you don't have permission to view it.</p>
+            <Button onClick={() => navigate(`/${userRole}-orders`)}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Orders
+            </Button>
+          </CardContent>
+        </Card>
       </DashboardLayout>
     );
   }
-  
+
   return (
     <DashboardLayout userRole={userRole}>
-      <div className="mb-6">
-        <Button 
-          variant="outline" 
-          onClick={() => navigate(`/${userRole}-orders`)} 
-          className="mb-4"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
+      <DashboardHeader title="Order Details" userName={profile?.name || ""} userRole={userRole} />
+      
+      <div className="flex items-center justify-between mb-6">
+        <Button variant="outline" onClick={() => navigate(`/${userRole}-orders`)}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Orders
         </Button>
         
-        <DashboardHeader 
-          title="Order Details" 
-          userName={profile?.name || "User"} 
-          userRole={userRole}
-        />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleDownloadInvoice}>
+            <Download className="h-4 w-4 mr-2" />
+            Download Invoice
+          </Button>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+        <div className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-xl">Order #{order.id.slice(0, 8)}</CardTitle>
-                  <CardDescription className="mt-1">
-                    Placed on {new Date(order.created_at).toLocaleDateString("en-US", { 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
-                  </CardDescription>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {getStatusBadge(order.status)}
-                  {getPaymentStatusBadge(order.payment_status)}
-                </div>
-              </div>
+              <CardTitle>Order Information</CardTitle>
+              <CardDescription>Details about this order</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="border rounded-md">
-                <div className="bg-muted p-4 rounded-t-md">
-                  <h3 className="font-medium">Order Items</h3>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium">Order ID</p>
+                  <p className="text-sm text-muted-foreground">{id}</p>
                 </div>
-                <div className="p-4">
-                  <div className="flex items-center">
-                    <div className="h-16 w-16 bg-muted rounded-md flex items-center justify-center mr-4">
-                      {product.image_url ? (
-                        <img src={product.image_url} alt={product.name} className="h-full w-full object-cover rounded-md" />
-                      ) : (
-                        <Package className="h-8 w-8 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium">{product.name}</h4>
-                      <div className="text-sm text-muted-foreground">
-                        <span>{product.category}</span>
-                        <span className="mx-2">•</span>
-                        <span>{product.location}</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium">{formatCurrency(order.price)} / {product.unit}</div>
-                      <div className="text-sm text-muted-foreground">Quantity: {order.quantity} {product.unit}</div>
-                    </div>
-                  </div>
-                  
-                  <Separator className="my-4" />
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Total</span>
-                    <span className="font-bold text-lg">{formatCurrency(order.total_amount)}</span>
-                  </div>
+                <div>
+                  <p className="text-sm font-medium">Date</p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(order.created_at).toLocaleDateString()}
+                  </p>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="border rounded-md">
-                  <div className="bg-muted p-4 rounded-t-md">
-                    <h3 className="font-medium">Payment Information</h3>
-                  </div>
-                  <div className="p-4 space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Status</span>
-                      <span>{getPaymentStatusBadge(order.payment_status)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Method</span>
-                      <span>Bank Transfer</span>
-                    </div>
-                    {order.payment_date && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">Date</span>
-                        <span>{new Date(order.payment_date).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                  </div>
+                <div>
+                  <p className="text-sm font-medium">Status</p>
+                  <Badge variant="outline" className={getStatusColor(order.status)}>
+                    {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                  </Badge>
                 </div>
-                
-                <div className="border rounded-md">
-                  <div className="bg-muted p-4 rounded-t-md">
-                    <h3 className="font-medium">Shipping Information</h3>
+                <div>
+                  <p className="text-sm font-medium">Payment Status</p>
+                  <Badge variant="outline" className={getPaymentStatusColor(order.payment_status)}>
+                    {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
+                  </Badge>
+                </div>
+                {order.payment_date && (
+                  <div>
+                    <p className="text-sm font-medium">Payment Date</p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(order.payment_date).toLocaleDateString()}
+                    </p>
                   </div>
-                  <div className="p-4 space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Status</span>
-                      <span>{getStatusBadge(order.status)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Destination</span>
-                      <span>{counterpartyProfile.city || "Not specified"}</span>
-                    </div>
-                    {order.delivery_date && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">Delivery Date</span>
-                        <span>{new Date(order.delivery_date).toLocaleDateString()}</span>
-                      </div>
-                    )}
+                )}
+                {order.delivery_date && (
+                  <div>
+                    <p className="text-sm font-medium">Delivery Date</p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(order.delivery_date).toLocaleDateString()}
+                    </p>
                   </div>
-                </div>
-              </div>
-              
-              {order.notes && (
-                <div className="border rounded-md p-4">
-                  <h3 className="font-medium mb-2">Order Notes</h3>
-                  <p className="text-sm">{order.notes}</p>
-                </div>
-              )}
-              
-              {canUpdateStatus() && (
-                <div className="border rounded-md p-4">
-                  <h3 className="font-medium mb-4">Update Order Status</h3>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <Select 
-                        value={newStatus} 
-                        onValueChange={(value) => setNewStatus(value as OrderStatus)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select new status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getStatusSelectItems()}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button onClick={handleStatusUpdate} disabled={updating || newStatus === order.status}>
-                      {updating ? "Updating..." : "Update Status"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-              
-              <div className="border rounded-md p-4">
-                <h3 className="font-medium mb-4">Add a Note</h3>
-                <div className="space-y-4">
-                  <Textarea 
-                    placeholder="Add a note to this order..." 
-                    value={newNote}
-                    onChange={(e) => setNewNote(e.target.value)}
-                  />
-                  <Button onClick={handleAddNote} disabled={updating || !newNote.trim()}>
-                    Add Note
-                  </Button>
-                </div>
+                )}
               </div>
             </CardContent>
-            <CardFooter className="flex flex-wrap justify-between gap-4 border-t pt-6">
-              <Button variant="outline" onClick={() => navigate(`/${userRole}-orders`)}>
-                Back to Orders
-              </Button>
-              
-              <div className="flex gap-2">
-                {order.status === "confirmed" && userRole === "farmer" && (
-                  <Button>
-                    <Truck className="mr-2 h-4 w-4" />
-                    Create Shipment
+            {userRole === 'trader' && (
+              <CardFooter className="flex-col items-start space-y-2">
+                <p className="text-sm font-medium">Update Payment Status</p>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    variant={order.payment_status === 'pending' ? "default" : "outline"}
+                    onClick={() => handleUpdatePaymentStatus('pending')}
+                  >
+                    Pending
                   </Button>
-                )}
-                <Button variant="outline">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Download Invoice
-                </Button>
+                  <Button 
+                    size="sm" 
+                    variant={order.payment_status === 'processing' ? "default" : "outline"}
+                    onClick={() => handleUpdatePaymentStatus('processing')}
+                  >
+                    Processing
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant={order.payment_status === 'completed' ? "default" : "outline"}
+                    onClick={() => handleUpdatePaymentStatus('completed')}
+                  >
+                    Completed
+                  </Button>
+                </div>
+              </CardFooter>
+            )}
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>{userRole === 'farmer' ? 'Trader' : 'Farmer'} Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center space-x-4 mb-4">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage 
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${otherParty?.name}`} 
+                    alt={otherParty?.name} 
+                  />
+                  <AvatarFallback>
+                    <User className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-medium">{otherParty?.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{userRole === 'farmer' ? 'Trader' : 'Farmer'}</p>
+                </div>
               </div>
+              <Separator className="my-4" />
+              <div className="space-y-2">
+                {otherParty?.phone && (
+                  <div>
+                    <p className="text-xs font-medium">Phone</p>
+                    <p className="text-sm">{otherParty.phone}</p>
+                  </div>
+                )}
+                {otherParty?.address && (
+                  <div>
+                    <p className="text-xs font-medium">Address</p>
+                    <p className="text-sm">
+                      {otherParty.address}
+                      {otherParty.city && `, ${otherParty.city}`}
+                      {otherParty.state && `, ${otherParty.state}`}
+                      {otherParty.pincode && ` - ${otherParty.pincode}`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/messages', { state: { userId: otherParty?.id } })}>
+                Message
+              </Button>
             </CardFooter>
           </Card>
         </div>
         
-        <div className="space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>{userRole === "farmer" ? "Customer" : "Seller"} Information</CardTitle>
+              <CardTitle>Product Details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src="" />
-                  <AvatarFallback>
-                    {counterpartyProfile.name.split(' ').map(name => name[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">{counterpartyProfile.name}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {userRole === "farmer" ? "Trader" : "Farmer"}
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="w-full md:w-1/3">
+                  <div className="aspect-square bg-muted rounded-md overflow-hidden mb-4">
+                    {order.product.image_url ? (
+                      <img 
+                        src={order.product.image_url} 
+                        alt={order.product.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="h-16 w-16 text-muted-foreground" />
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-              
-              {counterpartyProfile.phone && (
-                <div className="flex items-center text-sm">
-                  <span className="text-muted-foreground mr-2">Phone:</span>
-                  <span>{counterpartyProfile.phone}</span>
+                <div className="w-full md:w-2/3">
+                  <h3 className="text-lg font-medium mb-2">{order.product.name}</h3>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <p className="text-sm font-medium">Category</p>
+                      <p className="text-sm text-muted-foreground">{order.product.category}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Quality</p>
+                      <p className="text-sm text-muted-foreground">{order.product.quality}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Location</p>
+                      <p className="text-sm text-muted-foreground">{order.product.location}</p>
+                    </div>
+                  </div>
+                  {order.product.description && (
+                    <div className="mb-4">
+                      <p className="text-sm font-medium">Description</p>
+                      <p className="text-sm text-muted-foreground">{order.product.description}</p>
+                    </div>
+                  )}
+                  <Separator className="my-4" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium">Price</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatCurrency(order.price)}/{order.product.unit}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Quantity</p>
+                      <p className="text-sm text-muted-foreground">
+                        {order.quantity} {order.product.unit}
+                      </p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-sm font-medium">Total Amount</p>
+                      <p className="text-lg font-bold">
+                        {formatCurrency(order.total_amount)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              )}
-              
-              {counterpartyProfile.address && (
-                <div className="flex items-center text-sm">
-                  <span className="text-muted-foreground mr-2">Address:</span>
-                  <span>
-                    {counterpartyProfile.address}
-                    {counterpartyProfile.city && `, ${counterpartyProfile.city}`}
-                    {counterpartyProfile.state && `, ${counterpartyProfile.state}`}
-                  </span>
-                </div>
-              )}
-              
-              <Separator />
-              
-              <div className="space-y-2">
-                <Button variant="outline" className="w-full">
-                  <MessageCircle className="mr-2 h-4 w-4" />
-                  Contact {userRole === "farmer" ? "Customer" : "Seller"}
-                </Button>
               </div>
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader>
-              <CardTitle>Timeline</CardTitle>
+              <CardTitle>Shipment Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {shipment ? (
+                <Tabs defaultValue="details" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="details">Details</TabsTrigger>
+                    <TabsTrigger value="tracking">Tracking</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="details">
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <p className="text-sm font-medium">Tracking Number</p>
+                        <p className="text-sm text-muted-foreground">{shipment.tracking_number}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Status</p>
+                        <Badge variant="outline">
+                          {shipment.status.replace('_', ' ').charAt(0).toUpperCase() + 
+                            shipment.status.replace('_', ' ').slice(1)}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Dispatch Date</p>
+                        <p className="text-sm text-muted-foreground">
+                          {shipment.dispatch_date ? 
+                            new Date(shipment.dispatch_date).toLocaleDateString() : 
+                            'Pending'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Estimated Delivery</p>
+                        <p className="text-sm text-muted-foreground">
+                          {shipment.estimated_delivery ? 
+                            new Date(shipment.estimated_delivery).toLocaleDateString() : 
+                            'Pending'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Carrier</p>
+                        <p className="text-sm text-muted-foreground">{shipment.carrier}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Destination</p>
+                        <p className="text-sm text-muted-foreground">{shipment.destination}</p>
+                      </div>
+                      {shipment.notes && (
+                        <div className="col-span-2">
+                          <p className="text-sm font-medium">Notes</p>
+                          <p className="text-sm text-muted-foreground">{shipment.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="tracking">
+                    <div className="mt-4">
+                      <div className="relative">
+                        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-muted-foreground/20" />
+                        <div className="space-y-6 relative">
+                          {[
+                            { status: "Order Placed", date: new Date(order.created_at).toLocaleDateString(), completed: true },
+                            { status: "Processing", date: shipment.status === "processing" ? "Current" : (shipment.status === "packed" || shipment.status === "shipped" || shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" ? "Completed" : "Pending"), completed: shipment.status === "processing" || shipment.status === "packed" || shipment.status === "shipped" || shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" },
+                            { status: "Packed", date: shipment.status === "packed" ? "Current" : (shipment.status === "shipped" || shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" ? "Completed" : "Pending"), completed: shipment.status === "packed" || shipment.status === "shipped" || shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" },
+                            { status: "Shipped", date: shipment.status === "shipped" ? "Current" : (shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" ? "Completed" : "Pending"), completed: shipment.status === "shipped" || shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" },
+                            { status: "In Transit", date: shipment.status === "in_transit" ? "Current" : (shipment.status === "out_for_delivery" || shipment.status === "delivered" ? "Completed" : "Pending"), completed: shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" },
+                            { status: "Out for Delivery", date: shipment.status === "out_for_delivery" ? "Current" : (shipment.status === "delivered" ? "Completed" : "Pending"), completed: shipment.status === "out_for_delivery" || shipment.status === "delivered" },
+                            { status: "Delivered", date: shipment.status === "delivered" ? shipment.actual_delivery ? new Date(shipment.actual_delivery).toLocaleDateString() : "Completed" : "Pending", completed: shipment.status === "delivered" }
+                          ].map((step, index) => (
+                            <div key={index} className="ml-9">
+                              <div className="flex items-center mb-1">
+                                <div className={`absolute -left-1 w-6 h-6 flex items-center justify-center rounded-full ${step.completed ? "bg-primary" : "bg-muted"}`}>
+                                  {step.completed && (
+                                    <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
+                                  )}
+                                </div>
+                                <h4 className={`text-sm font-medium ${step.completed ? "text-foreground" : "text-muted-foreground"}`}>
+                                  {step.status}
+                                </h4>
+                              </div>
+                              <p className="text-xs text-muted-foreground">{step.date}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <Truck className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Shipment Created Yet</h3>
+                  <p className="text-sm text-muted-foreground text-center mb-4">
+                    Shipping information will appear here once available.
+                  </p>
+                  {userRole === 'farmer' && order.status === 'processing' && (
+                    <Button onClick={() => navigate(`/farmer-shipments/create?orderId=${id}`)}>
+                      Create Shipment
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Order Actions</CardTitle>
+              <CardDescription>
+                Manage this order
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-start">
-                  <div className="mt-0.5 bg-green-100 p-2 rounded-full">
-                    <Calendar className="h-4 w-4 text-green-600" />
-                  </div>
-                  <div className="ml-3">
-                    <div className="text-sm font-medium">Order Placed</div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(order.created_at).toLocaleString()}
-                    </div>
+                <div>
+                  <p className="text-sm font-medium mb-2">Update Order Status</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['pending', 'processing', 'completed', 'cancelled'].map((status) => (
+                      <Button
+                        key={status}
+                        variant={order.status === status ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleUpdateOrderStatus(status)}
+                      >
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </Button>
+                    ))}
                   </div>
                 </div>
                 
-                {order.status !== "pending" && order.status !== "cancelled" && (
-                  <div className="flex items-start">
-                    <div className="mt-0.5 bg-blue-100 p-2 rounded-full">
-                      <CheckCircle className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <div className="ml-3">
-                      <div className="text-sm font-medium">Order Confirmed</div>
-                      <div className="text-xs text-muted-foreground">
-                        After order placement
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {(order.status === "shipped" || order.status === "delivered" || order.status === "completed") && (
-                  <div className="flex items-start">
-                    <div className="mt-0.5 bg-purple-100 p-2 rounded-full">
-                      <Truck className="h-4 w-4 text-purple-600" />
-                    </div>
-                    <div className="ml-3">
-                      <div className="text-sm font-medium">Order Shipped</div>
-                      <div className="text-xs text-muted-foreground">
-                        After confirmation
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {(order.status === "delivered" || order.status === "completed") && (
-                  <div className="flex items-start">
-                    <div className="mt-0.5 bg-green-100 p-2 rounded-full">
-                      <CalendarCheck className="h-4 w-4 text-green-600" />
-                    </div>
-                    <div className="ml-3">
-                      <div className="text-sm font-medium">Order Delivered</div>
-                      <div className="text-xs text-muted-foreground">
-                        {order.delivery_date 
-                          ? new Date(order.delivery_date).toLocaleDateString()
-                          : "Date not recorded"}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {order.status === "cancelled" && (
-                  <div className="flex items-start">
-                    <div className="mt-0.5 bg-red-100 p-2 rounded-full">
-                      <XCircle className="h-4 w-4 text-red-600" />
-                    </div>
-                    <div className="ml-3">
-                      <div className="text-sm font-medium">Order Cancelled</div>
-                      <div className="text-xs text-muted-foreground">
-                        After order placement
-                      </div>
-                    </div>
+                {order.notes && (
+                  <div>
+                    <p className="text-sm font-medium mb-2">Order Notes</p>
+                    <p className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                      {order.notes}
+                    </p>
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Need Help?</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button variant="outline" className="w-full">
-                <AlertCircle className="mr-2 h-4 w-4" />
-                Report an Issue
-              </Button>
-              <Button variant="outline" className="w-full">
-                <ExternalLink className="mr-2 h-4 w-4" />
-                View Support Center
-              </Button>
             </CardContent>
           </Card>
         </div>

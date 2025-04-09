@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -9,87 +10,22 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Search, Send, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useMessages } from "@/hooks/useMessages";
 import { useToast } from "@/hooks/use-toast";
 
 const TraderMessages = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
+  const { loading, conversations, currentMessages, fetchMessages, sendMessage } = useMessages();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
 
-  useEffect(() => {
-    const fetchConversations = async () => {
-      if (!profile?.id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('conversations')
-          .select(`
-            *,
-            user1:user1_id (id, name, role),
-            user2:user2_id (id, name, role)
-          `)
-          .or(`user1_id.eq.${profile.id},user2_id.eq.${profile.id}`)
-          .order('updated_at', { ascending: false });
-          
-        if (error) throw error;
-        
-        // Transform data to get the other user in each conversation
-        const transformedConversations = (data || []).map(conv => ({
-          id: conv.id,
-          user: conv.user1_id === profile.id ? conv.user2 : conv.user1,
-          lastMessage: conv.last_message,
-          updatedAt: conv.updated_at
-        }));
-        
-        setConversations(transformedConversations);
-      } catch (error) {
-        console.error('Error fetching conversations:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load conversations",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchConversations();
-  }, [profile?.id, toast]);
-
-  useEffect(() => {
-    const fetchMessages = async () => {
-      if (!selectedChat || !profile?.id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('conversation_id', selectedChat)
-          .order('created_at', { ascending: true });
-          
-        if (error) throw error;
-        
-        setMessages(data || []);
-      } catch (error) {
-        console.error('Error fetching messages:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load messages",
-          variant: "destructive"
-        });
-      }
-    };
-    
-    fetchMessages();
-  }, [selectedChat, profile?.id, toast]);
+  const handleChatSelect = (userId: string) => {
+    setSelectedChat(userId);
+    fetchMessages(userId);
+  };
 
   const handleSendMessage = async () => {
     if (!selectedChat || !profile?.id || !newMessage.trim()) return;
@@ -97,38 +33,8 @@ const TraderMessages = () => {
     setSendingMessage(true);
     
     try {
-      const { error: messageError } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: selectedChat,
-          sender_id: profile.id,
-          content: newMessage.trim()
-        });
-        
-      if (messageError) throw messageError;
-      
-      // Update conversation's last message
-      const { error: conversationError } = await supabase
-        .from('conversations')
-        .update({
-          last_message: newMessage.trim(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', selectedChat);
-        
-      if (conversationError) throw conversationError;
-      
+      await sendMessage(selectedChat, newMessage.trim());
       setNewMessage("");
-      // Refresh messages
-      const { data: newMessages, error: fetchError } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', selectedChat)
-        .order('created_at', { ascending: true });
-        
-      if (fetchError) throw fetchError;
-      
-      setMessages(newMessages || []);
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -181,10 +87,13 @@ const TraderMessages = () => {
                           ? "bg-muted"
                           : "hover:bg-muted/50"
                       }`}
-                      onClick={() => setSelectedChat(conversation.id)}
+                      onClick={() => handleChatSelect(conversation.id)}
                     >
                       <Avatar>
-                        <AvatarImage src={conversation.user.avatar} />
+                        <AvatarImage 
+                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${conversation.user.name}`} 
+                          alt={conversation.user.name} 
+                        />
                         <AvatarFallback>
                           {conversation.user.name.split(' ').map(name => name[0]).join('')}
                         </AvatarFallback>
@@ -193,6 +102,9 @@ const TraderMessages = () => {
                         <h4 className="font-medium truncate">{conversation.user.name}</h4>
                         <span className="text-xs text-muted-foreground">{conversation.user.role}</span>
                       </div>
+                      {conversation.unread && (
+                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -215,7 +127,7 @@ const TraderMessages = () => {
               <>
                 <ScrollArea className="h-[500px] mb-4">
                   <div className="space-y-4">
-                    {messages.map((message) => (
+                    {currentMessages.map((message) => (
                       <div
                         key={message.id}
                         className={`flex ${
@@ -277,4 +189,4 @@ const TraderMessages = () => {
   );
 };
 
-export default TraderMessages; 
+export default TraderMessages;

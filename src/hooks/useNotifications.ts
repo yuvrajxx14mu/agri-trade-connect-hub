@@ -36,8 +36,14 @@ export const useNotifications = () => {
       
       if (fetchError) throw fetchError;
       
-      setNotifications(data || []);
-      setUnreadCount(data?.filter(n => !n.read).length || 0);
+      // Ensure all notifications have the read property
+      const notificationsWithRead = data?.map(notification => ({
+        ...notification,
+        read: notification.read !== undefined ? notification.read : notification.is_read || false
+      })) || [];
+      
+      setNotifications(notificationsWithRead as Notification[]);
+      setUnreadCount(notificationsWithRead.filter(n => !n.read).length || 0);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching notifications:', err);
@@ -126,7 +132,10 @@ export const useNotifications = () => {
         }, 
         (payload) => {
           // Handle new notification
-          const newNotification = payload.new as Notification;
+          const newNotification = {
+            ...payload.new as Notification,
+            read: false
+          };
           
           // Update notifications list
           setNotifications(prev => [newNotification, ...prev]);

@@ -42,52 +42,66 @@ export const useMessages = () => {
       
       // Get all messages where the current user is either sender or receiver
       const { data: messages, error: messagesError } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`)
+        .rpc('get_user_messages', { user_id: profile.id })
         .order('created_at', { ascending: false });
       
-      if (messagesError) throw messagesError;
-      
-      // Get unique user IDs from messages
-      const userIds = new Set<string>();
-      messages?.forEach(message => {
-        if (message.sender_id !== profile.id) userIds.add(message.sender_id);
-        if (message.receiver_id !== profile.id) userIds.add(message.receiver_id);
-      });
-      
-      // Fetch user profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', Array.from(userIds));
-      
-      if (profilesError) throw profilesError;
-      
-      // Create conversation objects
-      const conversationMap = new Map<string, Conversation>();
-      
-      messages?.forEach(message => {
-        const otherUserId = message.sender_id === profile.id ? message.receiver_id : message.sender_id;
-        const otherUser = profiles?.find(p => p.id === otherUserId);
+      if (messagesError) {
+        // Fallback to direct query if RPC is not set up
+        const { data: directMessages, error: directError } = await supabase
+          .from('messages')
+          .select('*')
+          .or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`)
+          .order('created_at', { ascending: false });
+          
+        if (directError) throw directError;
         
-        if (!otherUser) return;
-        
-        if (!conversationMap.has(otherUserId)) {
-          conversationMap.set(otherUserId, {
-            id: otherUserId,
-            user: {
-              name: otherUser.name,
-              role: otherUser.role
-            },
-            lastMessage: message.content,
-            timestamp: message.created_at,
-            unread: message.receiver_id === profile.id && !message.read
+        if (directMessages) {
+          // Get unique user IDs from messages
+          const userIds = new Set<string>();
+          directMessages.forEach(message => {
+            if (message.sender_id !== profile.id) userIds.add(message.sender_id);
+            if (message.receiver_id !== profile.id) userIds.add(message.receiver_id);
           });
+          
+          // Fetch user profiles
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', Array.from(userIds));
+          
+          if (profilesError) throw profilesError;
+          
+          // Create conversation objects
+          const conversationMap = new Map<string, Conversation>();
+          
+          directMessages.forEach(message => {
+            const otherUserId = message.sender_id === profile.id ? message.receiver_id : message.sender_id;
+            const otherUser = profiles?.find(p => p.id === otherUserId);
+            
+            if (!otherUser) return;
+            
+            if (!conversationMap.has(otherUserId)) {
+              conversationMap.set(otherUserId, {
+                id: otherUserId,
+                user: {
+                  name: otherUser.name,
+                  role: otherUser.role
+                },
+                lastMessage: message.content,
+                timestamp: message.created_at,
+                unread: message.receiver_id === profile.id && !message.read
+              });
+            }
+          });
+          
+          setConversations(Array.from(conversationMap.values()));
         }
-      });
+      } else if (messages) {
+        // Process RPC results if available
+        // This code assumes your RPC returns formatted conversations
+        setConversations(messages as unknown as Conversation[]);
+      }
       
-      setConversations(Array.from(conversationMap.values()));
       setLoading(false);
     } catch (err) {
       console.error('Error fetching conversations:', err);
@@ -105,32 +119,44 @@ export const useMessages = () => {
       setLoading(true);
       
       const { data, error: messagesError } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`and(sender_id.eq.${profile.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${profile.id})`)
+        .rpc('get_conversation_messages', { user1_id: profile.id, user2_id: userId })
         .order('created_at', { ascending: true });
       
-      if (messagesError) throw messagesError;
-      
-      setCurrentMessages(data || []);
-      
-      // Mark messages as read
-      const unreadMessages = data?.filter(m => m.receiver_id === profile.id && !m.read) || [];
-      
-      if (unreadMessages.length > 0) {
-        const unreadIds = unreadMessages.map(m => m.id);
-        
-        await supabase
+      if (messagesError) {
+        // Fallback to direct query
+        const { data: directData, error: directError } = await supabase
           .from('messages')
-          .update({ read: true })
-          .in('id', unreadIds);
+          .select('*')
+          .or(`and(sender_id.eq.${profile.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${profile.id})`)
+          .order('created_at', { ascending: true });
           
-        // Update conversations
-        setConversations(prev => 
-          prev.map(conv => 
-            conv.id === userId ? { ...conv, unread: false } : conv
-          )
-        );
+        if (directError) throw directError;
+        
+        if (directData) {
+          setCurrentMessages(directData as Message[]);
+          
+          // Mark messages as read
+          const unreadMessages = directData.filter(m => m.receiver_id === profile.id && !m.read) || [];
+          
+          if (unreadMessages.length > 0) {
+            const unreadIds = unreadMessages.map(m => m.id);
+            
+            await supabase
+              .from('messages')
+              .update({ read: true })
+              .in('id', unreadIds);
+              
+            // Update conversations
+            setConversations(prev => 
+              prev.map(conv => 
+                conv.id === userId ? { ...conv, unread: false } : conv
+              )
+            );
+          }
+        }
+      } else if (data) {
+        // Process RPC results
+        setCurrentMessages(data as Message[]);
       }
       
       setLoading(false);
@@ -162,7 +188,7 @@ export const useMessages = () => {
       
       // Update current messages
       if (data && data.length > 0) {
-        setCurrentMessages(prev => [...prev, data[0]]);
+        setCurrentMessages(prev => [...prev, data[0] as Message]);
         
         // Update conversations
         setConversations(prev => 

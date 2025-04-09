@@ -8,10 +8,12 @@ interface ProfileData {
   name: string;
   role: string;
   phone: string;
+  email?: string;
   address?: string;
   city?: string;
   state?: string;
   pincode?: string;
+  farm_details?: any;
   created_at: string;
   updated_at: string;
 }
@@ -80,7 +82,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      setProfile(data);
+      // If the profile has email property, assign it
+      const profileWithEmail = {
+        ...data,
+        email: user?.email || ''
+      };
+
+      setProfile(profileWithEmail);
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
