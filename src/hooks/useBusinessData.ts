@@ -91,20 +91,17 @@ export const useBusinessData = (userId?: string) => {
     
     setSavingCompany(true);
     try {
-      const businessData = mapCompanyFormToBusinessDetails(data, userId);
-      
       if (businessDetails?.id) {
-        const { error } = await updateBusinessDetails(
-          businessDetails.id, 
-          {
-            business_name: data.companyName,
-            business_type: 'Trading',
-            business_address: data.companyAddress,
-            gst_number: data.gstin,
-            registration_number: data.tradeLicense,
-            updated_at: new Date().toISOString()
-          }
-        );
+        const businessData = {
+          business_name: data.companyName,
+          business_type: 'Trading',
+          business_address: data.companyAddress,
+          gst_number: data.gstin,
+          registration_number: data.tradeLicense,
+          updated_at: new Date().toISOString()
+        };
+        
+        const { error } = await updateBusinessDetails(businessDetails.id, businessData);
         
         if (error) throw error;
         
@@ -125,6 +122,13 @@ export const useBusinessData = (userId?: string) => {
           console.error('Error updating extended business data:', extError);
         }
       } else {
+        const businessData = mapCompanyFormToBusinessDetails(data, userId);
+        
+        // Ensure required fields are present
+        if (!businessData.business_name) {
+          throw new Error("Business name is required");
+        }
+        
         const { data: newBusiness, error } = await createBusinessDetails(businessData);
         
         if (error) throw error;

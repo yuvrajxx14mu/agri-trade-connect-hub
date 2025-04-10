@@ -20,7 +20,7 @@ export async function fetchBusinessDetails(userId: string) {
 export async function fetchExtendedBusinessData(businessId: string) {
   const params: GetBusinessExtendedDataParams = { b_id: businessId };
   return await supabase
-    .rpc('get_business_extended_data', params) as { data: BusinessExtendedDataResponse | null; error: any };
+    .rpc<BusinessExtendedDataResponse, GetBusinessExtendedDataParams>('get_business_extended_data', params);
 }
 
 export async function updateBusinessDetails(businessId: string, businessData: Partial<BusinessDetails>) {
@@ -30,7 +30,7 @@ export async function updateBusinessDetails(businessId: string, businessData: Pa
     .eq('id', businessId);
 }
 
-export async function createBusinessDetails(businessData: Partial<BusinessDetails>) {
+export async function createBusinessDetails(businessData: BusinessDetails) {
   return await supabase
     .from('business_details')
     .insert(businessData)
@@ -39,5 +39,5 @@ export async function createBusinessDetails(businessData: Partial<BusinessDetail
 
 export async function updateExtendedBusinessData(params: UpdateBusinessExtendedDataParams) {
   return await supabase
-    .rpc('update_business_extended_data', params) as { data: RPCVoidResponse | null; error: any };
+    .rpc<RPCVoidResponse, UpdateBusinessExtendedDataParams>('update_business_extended_data', params);
 }
