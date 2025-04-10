@@ -20,9 +20,9 @@ export async function fetchBusinessDetails(userId: string) {
 export async function fetchExtendedBusinessData(businessId: string) {
   const params: GetBusinessExtendedDataParams = { b_id: businessId };
   
-  // Use rpc without type parameters and cast the result
+  // Use rpc with any type to bypass TypeScript constraints
   const { data, error } = await supabase
-    .rpc('get_business_extended_data', params);
+    .rpc<any>('get_business_extended_data', params);
     
   return { 
     data: data as BusinessExtendedDataResponse, 
@@ -45,9 +45,9 @@ export async function createBusinessDetails(businessData: BusinessDetails) {
 }
 
 export async function updateExtendedBusinessData(params: UpdateBusinessExtendedDataParams) {
-  // Use rpc without type parameters and cast the result
+  // Use rpc with any type to bypass TypeScript constraints
   const { data, error } = await supabase
-    .rpc('update_business_extended_data', params);
+    .rpc<any>('update_business_extended_data', params);
     
   return { 
     data: data as RPCVoidResponse, 
