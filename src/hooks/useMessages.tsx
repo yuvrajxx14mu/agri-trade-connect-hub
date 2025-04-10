@@ -20,18 +20,16 @@ export const useMessages = () => {
       const { data: sentMessages, error: sentError } = await supabase
         .from('messages')
         .select('receiver_id')
-        .eq('sender_id', profile.id)
-        .distinct();
+        .eq('sender_id', profile.id);
 
       const { data: receivedMessages, error: receivedError } = await supabase
         .from('messages')
         .select('sender_id')
-        .eq('receiver_id', profile.id)
-        .distinct();
+        .eq('receiver_id', profile.id);
 
       if (sentError || receivedError) throw sentError || receivedError;
 
-      // Combine unique user IDs
+      // Combine unique user IDs manually without using distinct
       const uniqueUserIds = new Set([
         ...(sentMessages || []).map(msg => msg.receiver_id),
         ...(receivedMessages || []).map(msg => msg.sender_id)
@@ -40,6 +38,7 @@ export const useMessages = () => {
       // Fetch user details for these IDs
       const userIds = Array.from(uniqueUserIds);
       if (userIds.length === 0) {
+        setConversations([]);
         setLoading(false);
         return;
       }
@@ -110,7 +109,7 @@ export const useMessages = () => {
   }, [profile?.id, toast]);
 
   const sendMessage = useCallback(async (receiverId: string, content: string) => {
-    if (!profile?.id) return;
+    if (!profile?.id) return false;
     
     try {
       const { error } = await supabase

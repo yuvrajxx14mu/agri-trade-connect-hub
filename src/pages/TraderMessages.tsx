@@ -1,370 +1,284 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { Search, Send, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, SendIcon, Search, UserIcon, Users } from "lucide-react";
+import { useMessages } from "@/hooks/useMessages";
 import { useAuth } from "@/context/AuthContext";
+import { formatDistanceToNow } from 'date-fns';
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 
 const TraderMessages = () => {
+  const navigate = useNavigate();
   const { profile } = useAuth();
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [currentMessages, setCurrentMessages] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedChat, setSelectedChat] = useState<string | null>(null);
-  const [newMessage, setNewMessage] = useState("");
-  const [sendingMessage, setSendingMessage] = useState(false);
+  const [activeTab, setActiveTab] = useState('inbox');
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [newMessage, setNewMessage] = useState('');
+  const { 
+    conversations, 
+    currentMessages, 
+    fetchConversations, 
+    fetchMessages, 
+    sendMessage, 
+    loading 
+  } = useMessages();
 
   useEffect(() => {
-    if (profile?.id) {
-      fetchConversations();
-      
-      // Set up real-time subscription for new messages
-      const channel = supabase
-        .channel('messages-changes')
-        .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, 
-          (payload) => {
-            handleNewMessage(payload.new);
+    // Set up subscription for new messages
+    const channel = supabase
+      .channel('messages-channel')
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages', 
+          filter: `receiver_id=eq.${profile?.id}` 
+        }, 
+        payload => {
+          fetchConversations();
+          if (selectedUser && (payload.new.sender_id === selectedUser.id)) {
+            fetchMessages(selectedUser.id);
           }
-        )
-        .subscribe();
-      
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [profile?.id]);
+        }
+      )
+      .subscribe();
 
-  const fetchConversations = async () => {
-    if (!profile?.id) return;
-    
-    setLoading(true);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id, selectedUser, fetchConversations, fetchMessages]);
+
+  // Modified function to handle the error with 'distinct'
+  const fetchUserConversations = async () => {
+    if (!profile?.id) return [];
+
     try {
-      // Get unique conversations where the current user is either sender or receiver
-      const { data: sentMessages, error: sentError } = await supabase
+      // Get unique sender IDs
+      const { data: sentToUsers, error: sentError } = await supabase
         .from('messages')
         .select('receiver_id')
-        .eq('sender_id', profile.id)
-        .distinct();
+        .eq('sender_id', profile.id);
 
-      const { data: receivedMessages, error: receivedError } = await supabase
+      // Get unique receiver IDs
+      const { data: receivedFromUsers, error: receivedError } = await supabase
         .from('messages')
         .select('sender_id')
-        .eq('receiver_id', profile.id)
-        .distinct();
+        .eq('receiver_id', profile.id);
 
-      if (sentError || receivedError) throw sentError || receivedError;
-
-      // Combine unique user IDs
-      const uniqueUserIds = new Set([
-        ...(sentMessages || []).map(msg => msg.receiver_id),
-        ...(receivedMessages || []).map(msg => msg.sender_id)
-      ]);
-
-      // Fetch user details for these IDs
-      const userIds = Array.from(uniqueUserIds);
-      if (userIds.length === 0) {
-        setLoading(false);
-        return;
+      if (sentError || receivedError) {
+        throw sentError || receivedError;
       }
 
-      const { data: profiles, error: profilesError } = await supabase
+      // Combine unique user IDs manually
+      const uniqueUserIds = new Set([
+        ...(sentToUsers || []).map(msg => msg.receiver_id),
+        ...(receivedFromUsers || []).map(msg => msg.sender_id)
+      ]);
+
+      const userIds = Array.from(uniqueUserIds);
+      if (userIds.length === 0) {
+        return [];
+      }
+
+      // Fetch user details
+      const { data: userProfiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, name, role')
         .in('id', userIds);
 
-      if (profilesError) throw profilesError;
-
-      const formattedConversations = (profiles || []).map(profile => ({
-        id: profile.id,
-        user: {
-          id: profile.id,
-          name: profile.name,
-          role: profile.role,
-          initials: profile.name.split(' ').map((n: string) => n[0]).join('')
-        }
-      }));
-
-      setConversations(formattedConversations);
-    } catch (error) {
-      console.error('Error fetching conversations:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load conversations",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMessages = async (userId: string) => {
-    if (!profile?.id) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`and(sender_id.eq.${profile.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${profile.id})`)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      // Mark received messages as read
-      const unreadMessageIds = data
-        ?.filter(msg => msg.receiver_id === profile.id && !msg.read)
-        .map(msg => msg.id) || [];
-
-      if (unreadMessageIds.length > 0) {
-        await supabase
-          .from('messages')
-          .update({ read: true })
-          .in('id', unreadMessageIds);
+      if (profilesError) {
+        throw profilesError;
       }
 
-      setCurrentMessages(data || []);
+      return (userProfiles || []).map(user => ({
+        id: user.id,
+        user: {
+          id: user.id,
+          name: user.name,
+          role: user.role,
+          initials: user.name.split(' ').map((n: string) => n[0]).join('')
+        }
+      }));
     } catch (error) {
-      console.error('Error fetching messages:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load messages",
-        variant: "destructive"
-      });
+      console.error('Error fetching conversations:', error);
+      return [];
     }
   };
 
-  const handleNewMessage = (message: any) => {
-    // If this is a message from the currently selected chat, add it to the conversation
-    if (selectedChat === message.sender_id) {
-      setCurrentMessages(prev => [...prev, message]);
-      
-      // Mark as read immediately
-      supabase
-        .from('messages')
-        .update({ read: true })
-        .eq('id', message.id)
-        .then(() => {});
-    }
-    
-    // Refresh conversations to show latest message
-    fetchConversations();
-  };
-
-  const handleChatSelect = (userId: string) => {
-    setSelectedChat(userId);
-    fetchMessages(userId);
+  const handleSelectUser = (user: any) => {
+    setSelectedUser(user);
+    fetchMessages(user.id);
   };
 
   const handleSendMessage = async () => {
-    if (!selectedChat || !profile?.id || !newMessage.trim()) return;
+    if (!newMessage.trim() || !selectedUser) return;
     
-    setSendingMessage(true);
-    
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: profile.id,
-          receiver_id: selectedChat,
-          content: newMessage.trim(),
-          read: false
-        });
-
-      if (error) throw error;
-
-      // Clear input field
-      setNewMessage("");
-      
-      // Fetch updated messages
-      fetchMessages(selectedChat);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive"
-      });
-    } finally {
-      setSendingMessage(false);
+    const success = await sendMessage(selectedUser.id, newMessage.trim());
+    if (success) {
+      setNewMessage('');
     }
   };
 
-  const filteredConversations = conversations.filter(conversation =>
-    conversation.user.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
     <DashboardLayout userRole="trader">
-      <DashboardHeader title="Messages" userName={profile?.name || "User"} userRole="trader" />
+      <DashboardHeader 
+        title="Messages" 
+        userName={profile?.name || 'User'} 
+        userRole="trader"
+      />
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Conversations</CardTitle>
-            <CardDescription>
-              Chat with farmers and other traders
-            </CardDescription>
-            <div className="mt-4">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search contacts..."
-                  className="pl-8"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Conversations List */}
+        <Card className="md:col-span-1">
+          <CardHeader className="px-4 py-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl">Conversations</CardTitle>
+              <Button variant="ghost" size="icon">
+                <Users className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="mt-2 relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                type="search"
+                placeholder="Search users..."
+                className="pl-8"
+              />
             </div>
           </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[500px]">
-              {loading ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <CardContent className="p-0">
+            <Tabs defaultValue="all" className="h-[calc(100vh-250px)]">
+              <div className="px-4 border-b">
+                <TabsList className="w-full justify-start pb-0 pt-0 h-10">
+                  <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
+                  <TabsTrigger value="farmers" className="text-xs">Farmers</TabsTrigger>
+                  <TabsTrigger value="traders" className="text-xs">Traders</TabsTrigger>
+                </TabsList>
+              </div>
+              
+              <TabsContent value="all" className="mt-0 overflow-auto h-[calc(100vh-300px)]">
+                {loading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : conversations.length > 0 ? (
+                  <div>
+                    {conversations.map((convo) => (
+                      <div 
+                        key={convo.id} 
+                        className={`flex items-center gap-3 p-3 hover:bg-muted cursor-pointer ${selectedUser?.id === convo.id ? 'bg-muted' : ''}`}
+                        onClick={() => handleSelectUser(convo.user)}
+                      >
+                        <Avatar>
+                          <AvatarImage src="" />
+                          <AvatarFallback>{convo.user.initials}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium truncate">{convo.user.name}</p>
+                            <span className="text-xs text-muted-foreground">12m</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {convo.user.role === 'farmer' ? 'Farmer' : 'Trader'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                    <UserIcon className="h-8 w-8 text-muted-foreground mb-3" />
+                    <h3 className="text-sm font-medium mb-1">No conversations yet</h3>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Start chatting with farmers and other traders
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+              
+              {/* Other tabs content would go here */}
+            </Tabs>
+          </CardContent>
+        </Card>
+        
+        {/* Message Content */}
+        <Card className="md:col-span-2">
+          {selectedUser ? (
+            <>
+              <CardHeader className="px-6 py-4 border-b flex-row items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Avatar>
+                    <AvatarImage src="" />
+                    <AvatarFallback>{selectedUser.initials}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <CardTitle className="text-base">{selectedUser.name}</CardTitle>
+                    <CardDescription>{selectedUser.role === 'farmer' ? 'Farmer' : 'Trader'}</CardDescription>
+                  </div>
                 </div>
-              ) : filteredConversations.length > 0 ? (
-                <div className="space-y-2">
-                  {filteredConversations.map((conversation) => (
+              </CardHeader>
+              <CardContent className="p-0 flex flex-col h-[calc(100vh-280px)]">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {currentMessages.map((msg) => (
                     <div 
-                      key={conversation.id}
-                      className={`flex items-center gap-3 rounded-lg p-3 cursor-pointer transition-colors ${
-                        selectedChat === conversation.id 
-                          ? 'bg-secondary' 
-                          : 'hover:bg-secondary/50'
-                      }`}
-                      onClick={() => handleChatSelect(conversation.id)}
+                      key={msg.id} 
+                      className={`flex ${msg.sender_id === profile?.id ? 'justify-end' : 'justify-start'}`}
                     >
-                      <Avatar>
-                        <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${conversation.user.name}`} />
-                        <AvatarFallback>{conversation.user.initials}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 overflow-hidden">
-                        <div className="font-medium leading-none mb-1">{conversation.user.name}</div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {conversation.user.role === 'farmer' ? 'Farmer' : 'Trader'}
+                      <div 
+                        className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                          msg.sender_id === profile?.id 
+                            ? 'bg-primary text-primary-foreground' 
+                            : 'bg-muted'
+                        }`}
+                      >
+                        <p className="text-sm">{msg.content}</p>
+                        <p className="text-xs opacity-70 mt-1">
+                          {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
                         </p>
                       </div>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No conversations found</p>
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-        
-        <Card className="lg:col-span-2">
-          {selectedChat ? (
-            <>
-              <CardHeader className="border-b">
-                {conversations.find(c => c.id === selectedChat)?.user && (
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarImage 
-                        src={`https://api.dicebear.com/7.x/initials/svg?seed=${
-                          conversations.find(c => c.id === selectedChat)?.user.name
-                        }`} 
-                      />
-                      <AvatarFallback>
-                        {conversations.find(c => c.id === selectedChat)?.user.initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <CardTitle className="text-lg">
-                        {conversations.find(c => c.id === selectedChat)?.user.name}
-                      </CardTitle>
-                      <CardDescription>
-                        {conversations.find(c => c.id === selectedChat)?.user.role === 'farmer' 
-                          ? 'Farmer' 
-                          : 'Trader'}
-                      </CardDescription>
-                    </div>
+                
+                <div className="p-4 border-t mt-auto">
+                  <div className="flex items-center gap-2">
+                    <Textarea 
+                      placeholder="Type your message..." 
+                      className="min-h-10 resize-none"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                    />
+                    <Button 
+                      size="icon" 
+                      onClick={handleSendMessage}
+                      disabled={!newMessage.trim()}
+                    >
+                      <SendIcon className="h-4 w-4" />
+                    </Button>
                   </div>
-                )}
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-[400px] p-4">
-                  {currentMessages.length > 0 ? (
-                    <div className="space-y-4">
-                      {currentMessages.map((message) => (
-                        <div 
-                          key={message.id}
-                          className={`flex ${
-                            message.sender_id === profile?.id ? 'justify-end' : 'justify-start'
-                          }`}
-                        >
-                          <div 
-                            className={`max-w-[75%] rounded-lg p-3 ${
-                              message.sender_id === profile?.id 
-                                ? 'bg-primary text-primary-foreground' 
-                                : 'bg-muted'
-                            }`}
-                          >
-                            <p className="text-sm">{message.content}</p>
-                            <p className="text-xs mt-1 opacity-70">
-                              {new Date(message.created_at).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-muted-foreground">No messages yet</p>
-                    </div>
-                  )}
-                </ScrollArea>
-                <Separator />
-                <div className="p-4 flex gap-2">
-                  <Input
-                    placeholder="Type your message..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                  />
-                  <Button 
-                    onClick={handleSendMessage}
-                    disabled={!newMessage.trim() || sendingMessage}
-                  >
-                    {sendingMessage ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
                 </div>
               </CardContent>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-[600px] p-4">
-              <div className="rounded-full bg-muted p-6 mb-4">
-                <Send className="h-8 w-8 text-muted-foreground" />
+            <div className="flex flex-col items-center justify-center h-[calc(100vh-250px)] px-4 text-center">
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                <SendIcon className="h-8 w-8 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-medium mb-2">Select a Conversation</h3>
-              <p className="text-muted-foreground text-center max-w-md">
-                Choose a contact from the list to start chatting or resume a conversation.
+              <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
+              <p className="text-muted-foreground max-w-md">
+                Choose a contact from the left to start messaging
               </p>
             </div>
           )}

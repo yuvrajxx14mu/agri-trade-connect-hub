@@ -2,7 +2,7 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate as useReactRouterNavigate } from "react-router-dom";
 
 interface Profile {
   id: string;
@@ -13,6 +13,7 @@ interface Profile {
   address?: string;
   created_at?: string;
   updated_at?: string;
+  bio?: string;
   [key: string]: any;
 }
 
@@ -24,17 +25,24 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string, role: "farmer" | "trader", phone?: string) => Promise<void>;
   signOut: () => Promise<void>;
   loading: boolean;
+  isLoading: boolean; // Add isLoading property
   updateProfile: (newProfileData: Partial<Profile>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+// Create a component that doesn't use useNavigate
+const AuthProviderContent = ({ 
+  children, 
+  navigate 
+}: { 
+  children: React.ReactNode; 
+  navigate: (path: string) => void;
+}) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -156,12 +164,27 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         signUp,
         signOut,
         loading,
+        isLoading: loading, // Set isLoading to match loading state
         updateProfile
       }}
     >
       {children}
     </AuthContext.Provider>
   );
+};
+
+// Create a wrapper component that uses useNavigate
+export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  // This is a wrapper to prevent the useNavigate call until we know we're in a Router context
+  try {
+    const navigate = useReactRouterNavigate();
+    return <AuthProviderContent navigate={navigate}>{children}</AuthProviderContent>;
+  } catch (error) {
+    // If useNavigate fails, use a fallback that just logs the intent to navigate
+    console.warn("Router not available, navigation will be logged but not performed");
+    const fallbackNavigate = (path: string) => console.log(`Navigation intended to: ${path}`);
+    return <AuthProviderContent navigate={fallbackNavigate}>{children}</AuthProviderContent>;
+  }
 };
 
 export const useAuth = () => {

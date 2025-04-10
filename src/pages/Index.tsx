@@ -5,15 +5,15 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 
 const Index = () => {
-  const { user, profile, isLoading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isLoading && user && profile) {
+    if (!loading && user && profile) {
       const redirectPath = profile.role === "farmer" ? "/farmer-dashboard" : "/trader-dashboard";
       navigate(redirectPath);
     }
-  }, [user, profile, isLoading, navigate]);
+  }, [user, profile, loading, navigate]);
 
   return (
     <div className="flex flex-col min-h-screen">

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -35,6 +34,24 @@ interface CompanyFormData {
   companyAddress: string;
   businessDescription: string;
   operationalAreas: string;
+}
+
+interface BusinessDetails {
+  id?: string;
+  user_id: string;
+  business_name: string;
+  business_type: string;
+  business_email?: string;
+  business_phone?: string;
+  business_website?: string;
+  business_address: string;
+  gst_number?: string;
+  registration_number?: string;
+  designation?: string;
+  business_description?: string;
+  operational_areas?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 const TraderProfile = () => {
@@ -176,13 +193,14 @@ const TraderProfile = () => {
     
     setSavingCompany(true);
     try {
-      const businessData = {
+      const businessData: BusinessDetails = {
         user_id: profile.id,
         business_name: data.companyName,
-        designation: data.designation,
+        business_type: 'Trading',
+        business_address: data.companyAddress,
         gst_number: data.gstin,
         registration_number: data.tradeLicense,
-        business_address: data.companyAddress,
+        designation: data.designation,
         business_description: data.businessDescription,
         operational_areas: data.operationalAreas,
         updated_at: new Date().toISOString()
