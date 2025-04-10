@@ -5,7 +5,9 @@ import {
   BusinessDetails, 
   ExtendedBusinessData, 
   CompanyFormData,
-  UpdateBusinessExtendedDataParams
+  UpdateBusinessExtendedDataParams,
+  BusinessExtendedDataResponse,
+  RPCVoidResponse
 } from "@/types/trader";
 import {
   fetchBusinessDetails,
