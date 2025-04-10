@@ -53,11 +53,16 @@ export interface CompanyFormData {
 
 // Supabase RPC function response types
 export interface TraderBioResponse {
-  bio_text?: string;
+  bio_text: string | null;
 }
 
 export interface BusinessExtendedDataResponse {
-  designation?: string;
-  description?: string;
-  areas?: string;
+  designation: string | null;
+  description: string | null;
+  areas: string | null;
+}
+
+// Define RPCVoidResponse type for functions that don't return data
+export interface RPCVoidResponse {
+  success: boolean;
 }

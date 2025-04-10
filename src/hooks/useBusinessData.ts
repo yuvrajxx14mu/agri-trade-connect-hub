@@ -6,7 +6,8 @@ import {
   BusinessDetails, 
   ExtendedBusinessData, 
   CompanyFormData,
-  BusinessExtendedDataResponse
+  BusinessExtendedDataResponse,
+  RPCVoidResponse
 } from "@/types/trader";
 
 export const useBusinessData = (userId?: string) => {
@@ -46,7 +47,7 @@ export const useBusinessData = (userId?: string) => {
         try {
           const { data, error: extBusinessError } = await supabase
             .rpc('get_business_extended_data', { b_id: businessData.id })
-            .returns<BusinessExtendedDataResponse>();
+            .returns<BusinessExtendedDataResponse | null>();
             
           if (!extBusinessError && data) {
             const extendedData: ExtendedBusinessData = {
@@ -169,7 +170,7 @@ export const useBusinessData = (userId?: string) => {
             description_text: data.businessDescription,
             areas_text: data.operationalAreas
           })
-          .returns<void>();
+          .returns<RPCVoidResponse>();
           
           const extendedData: ExtendedBusinessData = {
             designation: data.designation,
@@ -209,7 +210,7 @@ export const useBusinessData = (userId?: string) => {
               description_text: data.businessDescription,
               areas_text: data.operationalAreas
             })
-            .returns<void>();
+            .returns<RPCVoidResponse>();
             
             const extendedData: ExtendedBusinessData = {
               designation: data.designation,
