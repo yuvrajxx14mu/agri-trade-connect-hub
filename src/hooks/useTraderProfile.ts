@@ -39,6 +39,7 @@ interface ExtendedBusinessData {
   areas: string;
 }
 
+// Define proper return types for RPC function calls
 interface TraderBioResponse {
   bio_text?: string;
 }
@@ -101,8 +102,9 @@ export const useTraderProfile = () => {
       });
       
       try {
+        // Fix: Properly type the RPC function call with both type parameters
         const { data, error: extendedError } = await supabase
-          .rpc<TraderBioResponse>('get_trader_bio', { user_id: profile.id });
+          .rpc<TraderBioResponse, { user_id: string }>('get_trader_bio', { user_id: profile.id });
         
         if (!extendedError && data) {
           setProfileBio(data.bio_text || "");
@@ -143,8 +145,9 @@ export const useTraderProfile = () => {
         setBusinessDetails(businessData);
         
         try {
+          // Fix: Properly type the RPC function call with both type parameters
           const { data, error: extBusinessError } = await supabase
-            .rpc<BusinessExtendedDataResponse>('get_business_extended_data', { b_id: businessData.id });
+            .rpc<BusinessExtendedDataResponse, { b_id: string }>('get_business_extended_data', { b_id: businessData.id });
             
           if (!extBusinessError && data) {
             const extendedData: ExtendedBusinessData = {
@@ -251,6 +254,7 @@ export const useTraderProfile = () => {
       if (error) throw error;
       
       try {
+        // Fix: Properly type the RPC function call parameters
         await supabase.rpc('update_trader_bio', { 
           user_id: profile.id, 
           bio_text: data.bio 
@@ -313,6 +317,7 @@ export const useTraderProfile = () => {
         if (error) throw error;
         
         try {
+          // Fix: Properly type the RPC function call parameters
           await supabase.rpc('update_business_extended_data', { 
             business_id: businessDetails.id, 
             designation_text: data.designation,
@@ -352,6 +357,7 @@ export const useTraderProfile = () => {
           setBusinessDetails(newBusinessData);
           
           try {
+            // Fix: Properly type the RPC function call parameters
             await supabase.rpc('update_business_extended_data', { 
               business_id: newBusinessData.id, 
               designation_text: data.designation,
