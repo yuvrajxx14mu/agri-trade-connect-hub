@@ -9,7 +9,9 @@ import {
   FieldValues,
   FormProvider,
   useFormContext,
-  UseFormReturn
+  UseFormReturn,
+  Path,
+  PathValue,
 } from "react-hook-form"
 
 import { cn } from "@/lib/utils"
