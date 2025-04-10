@@ -48,7 +48,7 @@ export const useProfileData = (userId?: string) => {
       try {
         const params: GetTraderBioParams = { user_id: userId };
         const { data, error: extendedError } = await supabase
-          .rpc<TraderBioResponse>('get_trader_bio', params);
+          .rpc<TraderBioResponse, GetTraderBioParams>('get_trader_bio', params);
         
         if (!extendedError && data) {
           const bioResponse = data as TraderBioResponse;
@@ -117,7 +117,7 @@ export const useProfileData = (userId?: string) => {
         };
         
         const { error: bioError } = await supabase
-          .rpc<RPCVoidResponse>('update_trader_bio', params);
+          .rpc<RPCVoidResponse, UpdateTraderBioParams>('update_trader_bio', params);
         
         if (!bioError) {
           setProfileBio(data.bio);

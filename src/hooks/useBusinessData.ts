@@ -7,7 +7,8 @@ import {
   CompanyFormData,
   UpdateBusinessExtendedDataParams,
   BusinessExtendedDataResponse,
-  RPCVoidResponse
+  RPCVoidResponse,
+  GetBusinessExtendedDataParams
 } from "@/types/trader";
 import {
   fetchBusinessDetails,
