@@ -185,11 +185,13 @@ const FarmerAuctions = () => {
 
   const columns: ColumnDef<Auction>[] = [
     {
+      id: "product.name",
       accessorKey: "product.name",
       header: "Product",
       cell: ({ row }) => <div className="font-medium">{row.original.product.name}</div>
     },
     {
+      id: "product.quantity",
       accessorKey: "product.quantity",
       header: "Quantity",
       cell: ({ row }) => (

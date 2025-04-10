@@ -1,4 +1,3 @@
-
 import { flexRender, getCoreRowModel, useReactTable, getPaginationRowModel, getSortedRowModel, getFilteredRowModel } from "@tanstack/react-table";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -68,9 +67,23 @@ export function DataTable({
           <Input
             placeholder={searchPlaceholder}
             value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-            onChange={(event) =>
-              table.getColumn(searchKey)?.setFilterValue(event.target.value as string)
-            }
+            onChange={(event) => {
+              const column = table.getColumn(searchKey);
+              if (column) {
+                column.setFilterValue(event.target.value);
+                // Add custom filter function for nested properties
+                column.columnDef.filterFn = (row, columnId, filterValue) => {
+                  const keys = columnId.split('.');
+                  let value = row.original;
+                  for (const key of keys) {
+                    value = value[key];
+                  }
+                  return String(value)
+                    .toLowerCase()
+                    .includes(String(filterValue).toLowerCase());
+                };
+              }
+            }}
             className="max-w-sm"
           />
         )}

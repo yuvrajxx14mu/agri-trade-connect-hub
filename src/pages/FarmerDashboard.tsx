@@ -39,13 +39,12 @@ const FarmerDashboard = () => {
           .select('*')
           .eq('farmer_id', profile.id);
 
-        // Fetch active auctions - updated to check for inactive status with auction_id
+        // Fetch active auctions from the auctions table
         const { data: auctions } = await supabase
-          .from('products')
+          .from('auctions')
           .select('*')
           .eq('farmer_id', profile.id)
-          .eq('status', 'inactive')
-          .not('auction_id', 'is', null);
+          .eq('status', 'active');
 
         // Fetch total revenue from completed orders
         const { data: orders } = await supabase
@@ -54,7 +53,7 @@ const FarmerDashboard = () => {
           .eq('farmer_id', profile.id)
           .eq('status', 'completed');
 
-        // Fetch pending orders - updated to include all relevant statuses
+        // Fetch pending orders
         const { data: pendingOrders } = await supabase
           .from('orders')
           .select('*')
@@ -85,6 +84,38 @@ const FarmerDashboard = () => {
     };
 
     fetchDashboardData();
+
+    // Set up real-time subscription for auctions
+    const auctionSubscription = supabase
+      .channel('auctions-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'auctions',
+          filter: `farmer_id=eq.${profile?.id}`
+        },
+        async () => {
+          // Refetch auction count when there's any change
+          const { data: auctions } = await supabase
+            .from('auctions')
+            .select('*')
+            .eq('farmer_id', profile?.id)
+            .eq('status', 'active');
+          
+          setDashboardData(prev => ({
+            ...prev,
+            activeAuctions: auctions?.length || 0
+          }));
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription
+    return () => {
+      auctionSubscription.unsubscribe();
+    };
   }, [profile?.id]);
 
   // Helper function to calculate monthly revenue
