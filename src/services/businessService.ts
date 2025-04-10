@@ -19,8 +19,10 @@ export async function fetchBusinessDetails(userId: string) {
 
 export async function fetchExtendedBusinessData(businessId: string) {
   const params: GetBusinessExtendedDataParams = { b_id: businessId };
+  
+  // Update the rpc call without generic types, will cast the result instead
   const { data, error } = await supabase
-    .rpc<BusinessExtendedDataResponse, GetBusinessExtendedDataParams>('get_business_extended_data', params);
+    .rpc('get_business_extended_data', params);
     
   return { 
     data: data as BusinessExtendedDataResponse, 
@@ -43,8 +45,9 @@ export async function createBusinessDetails(businessData: BusinessDetails) {
 }
 
 export async function updateExtendedBusinessData(params: UpdateBusinessExtendedDataParams) {
+  // Update the rpc call without generic types, will cast the result instead
   const { data, error } = await supabase
-    .rpc<RPCVoidResponse, UpdateBusinessExtendedDataParams>('update_business_extended_data', params);
+    .rpc('update_business_extended_data', params);
     
   return { 
     data: data as RPCVoidResponse, 
