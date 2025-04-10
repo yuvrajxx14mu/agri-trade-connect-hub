@@ -1,8 +1,14 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ExtendedProfileData, ProfileFormData, TraderBioResponse, RPCVoidResponse } from "@/types/trader";
+import { 
+  ExtendedProfileData, 
+  ProfileFormData, 
+  TraderBioResponse, 
+  RPCVoidResponse,
+  GetTraderBioParams,
+  UpdateTraderBioParams
+} from "@/types/trader";
 
 export const useProfileData = (userId?: string) => {
   const { toast } = useToast();
@@ -39,8 +45,9 @@ export const useProfileData = (userId?: string) => {
       });
       
       try {
+        const params: GetTraderBioParams = { user_id: userId };
         const { data, error: extendedError } = await supabase
-          .rpc('get_trader_bio', { user_id: userId })
+          .rpc('get_trader_bio', params)
           .returns<TraderBioResponse>();
         
         if (!extendedError && data) {
@@ -103,11 +110,13 @@ export const useProfileData = (userId?: string) => {
       if (error) throw error;
       
       try {
-        await supabase.rpc('update_trader_bio', { 
+        const params: UpdateTraderBioParams = { 
           user_id: userId, 
           bio_text: data.bio 
-        })
-        .returns<RPCVoidResponse>();
+        };
+        
+        await supabase.rpc('update_trader_bio', params)
+          .returns<RPCVoidResponse>();
         
         setProfileBio(data.bio);
       } catch (bioError) {

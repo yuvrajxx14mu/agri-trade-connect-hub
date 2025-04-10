@@ -59,7 +59,7 @@ export const useTraderProfile = () => {
 
   useEffect(() => {
     // When both profile and business data are loaded, set the loading state to false
-    if (!loading && extendedProfile && personalFormData && companyFormData) {
+    if (extendedProfile && personalFormData && companyFormData) {
       setLoading(false);
     }
   }, [extendedProfile, personalFormData, companyFormData]);

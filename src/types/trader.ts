@@ -62,6 +62,27 @@ export interface BusinessExtendedDataResponse {
   areas: string | null;
 }
 
+// Define RPC function parameter types
+export interface GetTraderBioParams {
+  user_id: string;
+}
+
+export interface GetBusinessExtendedDataParams {
+  b_id: string;
+}
+
+export interface UpdateTraderBioParams {
+  user_id: string;
+  bio_text: string;
+}
+
+export interface UpdateBusinessExtendedDataParams {
+  business_id: string;
+  designation_text: string;
+  description_text: string;
+  areas_text: string;
+}
+
 // Define RPCVoidResponse type for functions that don't return data
 export interface RPCVoidResponse {
   success: boolean;

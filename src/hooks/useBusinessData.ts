@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -7,7 +6,9 @@ import {
   ExtendedBusinessData, 
   CompanyFormData,
   BusinessExtendedDataResponse,
-  RPCVoidResponse
+  RPCVoidResponse,
+  GetBusinessExtendedDataParams,
+  UpdateBusinessExtendedDataParams
 } from "@/types/trader";
 
 export const useBusinessData = (userId?: string) => {
@@ -45,8 +46,9 @@ export const useBusinessData = (userId?: string) => {
         setBusinessDetails(businessData);
         
         try {
+          const params: GetBusinessExtendedDataParams = { b_id: businessData.id };
           const { data, error: extBusinessError } = await supabase
-            .rpc('get_business_extended_data', { b_id: businessData.id })
+            .rpc('get_business_extended_data', params)
             .returns<BusinessExtendedDataResponse>();
             
           if (!extBusinessError && data) {
@@ -164,13 +166,15 @@ export const useBusinessData = (userId?: string) => {
         if (error) throw error;
         
         try {
-          await supabase.rpc('update_business_extended_data', { 
+          const params: UpdateBusinessExtendedDataParams = { 
             business_id: businessDetails.id, 
             designation_text: data.designation,
             description_text: data.businessDescription,
             areas_text: data.operationalAreas
-          })
-          .returns<RPCVoidResponse>();
+          };
+          
+          await supabase.rpc('update_business_extended_data', params)
+            .returns<RPCVoidResponse>();
           
           const extendedData: ExtendedBusinessData = {
             designation: data.designation,
@@ -179,7 +183,6 @@ export const useBusinessData = (userId?: string) => {
           };
           setExtendedBusinessData(extendedData);
           
-          // Update company form data state
           setCompanyFormData(data);
         } catch (extError) {
           console.error('Error updating extended business data:', extError);
@@ -204,13 +207,15 @@ export const useBusinessData = (userId?: string) => {
           setBusinessDetails(newBusinessData);
           
           try {
-            await supabase.rpc('update_business_extended_data', { 
+            const params: UpdateBusinessExtendedDataParams = { 
               business_id: newBusinessData.id, 
               designation_text: data.designation,
               description_text: data.businessDescription,
               areas_text: data.operationalAreas
-            })
-            .returns<RPCVoidResponse>();
+            };
+            
+            await supabase.rpc('update_business_extended_data', params)
+              .returns<RPCVoidResponse>();
             
             const extendedData: ExtendedBusinessData = {
               designation: data.designation,
@@ -219,7 +224,6 @@ export const useBusinessData = (userId?: string) => {
             };
             setExtendedBusinessData(extendedData);
             
-            // Update company form data state
             setCompanyFormData(data);
           } catch (extError) {
             console.error('Extended business data function not available:', extError);
