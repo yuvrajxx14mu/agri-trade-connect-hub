@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -15,7 +16,7 @@ import { User, MapPin, Phone, Mail, Shield, Bell, Key, Upload, Calendar, Buildin
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
+import { useForm, Path, PathValue } from "react-hook-form";
 import { 
   Form,
   FormControl,
@@ -119,12 +120,12 @@ const TraderProfile = () => {
     }
   });
 
-  const setPersonalValue = (field: keyof ProfileFormData, value: string) => {
-    personalForm.setValue(field, value as any);
+  const setPersonalValue = <K extends Path<ProfileFormData>>(field: K, value: PathValue<ProfileFormData, K>) => {
+    personalForm.setValue(field, value);
   };
   
-  const setCompanyValue = (field: keyof CompanyFormData, value: string) => {
-    companyForm.setValue(field, value as any);
+  const setCompanyValue = <K extends Path<CompanyFormData>>(field: K, value: PathValue<CompanyFormData, K>) => {
+    companyForm.setValue(field, value);
   };
   
   useEffect(() => {
