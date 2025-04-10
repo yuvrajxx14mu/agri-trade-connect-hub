@@ -20,12 +20,9 @@ export async function fetchBusinessDetails(userId: string) {
 export async function fetchExtendedBusinessData(businessId: string) {
   const params: GetBusinessExtendedDataParams = { b_id: businessId };
   
-  // Call RPC without type constraints, then cast the result
-  const { data, error } = await supabase
-    .rpc('get_business_extended_data', params) as unknown as {
-      data: BusinessExtendedDataResponse | null;
-      error: any;
-    };
+  // Use `any` as a workaround for the type constraint issue
+  const { data, error } = await (supabase
+    .rpc('get_business_extended_data', params) as any);
     
   return { 
     data: data as BusinessExtendedDataResponse, 
@@ -48,12 +45,9 @@ export async function createBusinessDetails(businessData: BusinessDetails) {
 }
 
 export async function updateExtendedBusinessData(params: UpdateBusinessExtendedDataParams) {
-  // Call RPC without type constraints, then cast the result
-  const { data, error } = await supabase
-    .rpc('update_business_extended_data', params) as unknown as {
-      data: RPCVoidResponse | null;
-      error: any;
-    };
+  // Use `any` as a workaround for the type constraint issue
+  const { data, error } = await (supabase
+    .rpc('update_business_extended_data', params) as any);
     
   return { 
     data: data as RPCVoidResponse, 
