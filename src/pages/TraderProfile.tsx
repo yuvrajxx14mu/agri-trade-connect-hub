@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -16,7 +15,7 @@ import { User, MapPin, Phone, Mail, Shield, Bell, Key, Upload, Calendar, Buildin
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useForm, FieldValues } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { 
   Form,
   FormControl,
@@ -120,13 +119,12 @@ const TraderProfile = () => {
     }
   });
 
-  // Using the correct type-safe setValue functions
   const setPersonalValue = (field: keyof ProfileFormData, value: string) => {
-    personalForm.setValue(field, value);
+    personalForm.setValue(field, value as any);
   };
   
   const setCompanyValue = (field: keyof CompanyFormData, value: string) => {
-    companyForm.setValue(field, value);
+    companyForm.setValue(field, value as any);
   };
   
   useEffect(() => {
