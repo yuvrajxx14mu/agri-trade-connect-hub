@@ -1,54 +1,47 @@
+
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { 
   BusinessDetails, 
   ExtendedBusinessData, 
   CompanyFormData,
-  BusinessExtendedDataResponse,
-  RPCVoidResponse,
-  GetBusinessExtendedDataParams,
   UpdateBusinessExtendedDataParams
 } from "@/types/trader";
+import {
+  fetchBusinessDetails,
+  fetchExtendedBusinessData,
+  updateBusinessDetails,
+  createBusinessDetails,
+  updateExtendedBusinessData
+} from "@/services/businessService";
+import {
+  createDefaultExtendedData,
+  createEmptyCompanyFormData,
+  mapBusinessToCompanyForm,
+  mapCompanyFormToBusinessDetails,
+  mapCompanyFormToExtendedData
+} from "@/utils/businessDataUtils";
 
 export const useBusinessData = (userId?: string) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [savingCompany, setSavingCompany] = useState(false);
   const [businessDetails, setBusinessDetails] = useState<BusinessDetails | null>(null);
-  const [extendedBusinessData, setExtendedBusinessData] = useState<ExtendedBusinessData>({
-    designation: 'Director of Procurement',
-    description: '',
-    areas: ''
-  });
-  const [companyFormData, setCompanyFormData] = useState<CompanyFormData>({
-    companyName: '',
-    designation: 'Director of Procurement',
-    gstin: '',
-    tradeLicense: '',
-    companyAddress: '',
-    businessDescription: '',
-    operationalAreas: ''
-  });
+  const [extendedBusinessData, setExtendedBusinessData] = useState<ExtendedBusinessData>(createDefaultExtendedData());
+  const [companyFormData, setCompanyFormData] = useState<CompanyFormData>(createEmptyCompanyFormData());
 
   const fetchBusinessData = async () => {
     setLoading(true);
     try {
       if (!userId) return;
       
-      const { data: businessData, error: businessError } = await supabase
-        .from('business_details')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
+      const { data: businessData, error: businessError } = await fetchBusinessDetails(userId);
       
       if (!businessError && businessData) {
         setBusinessDetails(businessData);
         
         try {
-          const params: GetBusinessExtendedDataParams = { b_id: businessData.id || '' };
-          const { data, error: extBusinessError } = await supabase
-            .rpc('get_business_extended_data', params) as { data: BusinessExtendedDataResponse | null; error: any };
+          const { data, error: extBusinessError } = await fetchExtendedBusinessData(businessData.id || '');
             
           if (!extBusinessError && data) {
             const extendedData: ExtendedBusinessData = {
@@ -57,18 +50,7 @@ export const useBusinessData = (userId?: string) => {
               areas: data.areas || ''
             };
             setExtendedBusinessData(extendedData);
-            
-            const newCompanyForm: CompanyFormData = {
-              companyName: businessData.business_name || '',
-              designation: extendedData.designation,
-              gstin: businessData.gst_number || '',
-              tradeLicense: businessData.registration_number || '',
-              companyAddress: businessData.business_address || '',
-              businessDescription: extendedData.description,
-              operationalAreas: extendedData.areas
-            };
-            
-            setCompanyFormData(newCompanyForm);
+            setCompanyFormData(mapBusinessToCompanyForm(businessData, extendedData));
           } else {
             setupDefaultBusinessData(businessData);
           }
@@ -92,46 +74,16 @@ export const useBusinessData = (userId?: string) => {
   };
 
   const setupDefaultBusinessData = (businessData: BusinessDetails) => {
-    const defaultExtendedData: ExtendedBusinessData = {
-      designation: 'Director of Procurement',
-      description: '',
-      areas: ''
-    };
+    const defaultExtendedData = createDefaultExtendedData();
     setExtendedBusinessData(defaultExtendedData);
-    
-    const newCompanyForm: CompanyFormData = {
-      companyName: businessData.business_name || '',
-      designation: defaultExtendedData.designation,
-      gstin: businessData.gst_number || '',
-      tradeLicense: businessData.registration_number || '',
-      companyAddress: businessData.business_address || '',
-      businessDescription: defaultExtendedData.description,
-      operationalAreas: defaultExtendedData.areas
-    };
-    
-    setCompanyFormData(newCompanyForm);
+    setCompanyFormData(mapBusinessToCompanyForm(businessData, defaultExtendedData));
   };
 
   const setupEmptyBusinessData = () => {
     setBusinessDetails(null);
-    const defaultNewBusinessData: ExtendedBusinessData = {
-      designation: 'Director of Procurement',
-      description: '',
-      areas: ''
-    };
+    const defaultNewBusinessData = createDefaultExtendedData();
     setExtendedBusinessData(defaultNewBusinessData);
-    
-    const newCompanyForm: CompanyFormData = {
-      companyName: '',
-      designation: defaultNewBusinessData.designation,
-      gstin: '',
-      tradeLicense: '',
-      companyAddress: '',
-      businessDescription: '',
-      operationalAreas: ''
-    };
-    
-    setCompanyFormData(newCompanyForm);
+    setCompanyFormData(createEmptyCompanyFormData());
   };
 
   const handleCompanySubmit = async (data: CompanyFormData) => {
@@ -139,28 +91,20 @@ export const useBusinessData = (userId?: string) => {
     
     setSavingCompany(true);
     try {
-      const businessData: BusinessDetails = {
-        user_id: userId,
-        business_name: data.companyName,
-        business_type: 'Trading',
-        business_address: data.companyAddress,
-        gst_number: data.gstin,
-        registration_number: data.tradeLicense,
-        updated_at: new Date().toISOString()
-      };
+      const businessData = mapCompanyFormToBusinessDetails(data, userId);
       
       if (businessDetails?.id) {
-        const { error } = await supabase
-          .from('business_details')
-          .update({
+        const { error } = await updateBusinessDetails(
+          businessDetails.id, 
+          {
             business_name: data.companyName,
             business_type: 'Trading',
             business_address: data.companyAddress,
             gst_number: data.gstin,
             registration_number: data.tradeLicense,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', businessDetails.id);
+          }
+        );
         
         if (error) throw error;
         
@@ -172,32 +116,16 @@ export const useBusinessData = (userId?: string) => {
             areas_text: data.operationalAreas
           };
           
-          await supabase
-            .rpc('update_business_extended_data', params) as { data: RPCVoidResponse | null; error: any };
+          await updateExtendedBusinessData(params);
           
-          const extendedData: ExtendedBusinessData = {
-            designation: data.designation,
-            description: data.businessDescription,
-            areas: data.operationalAreas
-          };
+          const extendedData = mapCompanyFormToExtendedData(data);
           setExtendedBusinessData(extendedData);
-          
           setCompanyFormData(data);
         } catch (extError) {
           console.error('Error updating extended business data:', extError);
         }
       } else {
-        const { data: newBusiness, error } = await supabase
-          .from('business_details')
-          .insert({
-            user_id: userId,
-            business_name: data.companyName,
-            business_type: 'Trading',
-            business_address: data.companyAddress,
-            gst_number: data.gstin,
-            registration_number: data.tradeLicense
-          })
-          .select();
+        const { data: newBusiness, error } = await createBusinessDetails(businessData);
         
         if (error) throw error;
         
@@ -213,16 +141,10 @@ export const useBusinessData = (userId?: string) => {
               areas_text: data.operationalAreas
             };
             
-            await supabase
-              .rpc('update_business_extended_data', params) as { data: RPCVoidResponse | null; error: any };
+            await updateExtendedBusinessData(params);
             
-            const extendedData: ExtendedBusinessData = {
-              designation: data.designation,
-              description: data.businessDescription,
-              areas: data.operationalAreas
-            };
+            const extendedData = mapCompanyFormToExtendedData(data);
             setExtendedBusinessData(extendedData);
-            
             setCompanyFormData(data);
           } catch (extError) {
             console.error('Extended business data function not available:', extError);
