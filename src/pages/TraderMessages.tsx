@@ -177,7 +177,9 @@ const TraderMessages = () => {
                       >
                         <Avatar>
                           <AvatarImage src="" />
-                          <AvatarFallback>{convo.user.initials}</AvatarFallback>
+                          <AvatarFallback>
+                            {convo.user.name ? convo.user.name.split(' ').map((n: string) => n[0]).join('') : 'U'}
+                          </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
@@ -215,7 +217,9 @@ const TraderMessages = () => {
                 <div className="flex items-center gap-3">
                   <Avatar>
                     <AvatarImage src="" />
-                    <AvatarFallback>{selectedUser.initials}</AvatarFallback>
+                    <AvatarFallback>
+                      {selectedUser.name ? selectedUser.name.split(' ').map((n: string) => n[0]).join('') : 'U'}
+                    </AvatarFallback>
                   </Avatar>
                   <div>
                     <CardTitle className="text-base">{selectedUser.name}</CardTitle>

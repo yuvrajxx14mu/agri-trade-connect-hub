@@ -16,6 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
+import { Json } from "@/integrations/supabase/types";
 
 interface ProfileFormData {
   firstName: string;
@@ -109,8 +110,8 @@ const TraderProfile = () => {
       if (userError) throw userError;
       
       setPersonalValue('email', userData.user?.email || '');
-      // For bio, we might store it separately or in the profiles table
-      setPersonalValue('bio', profileData.bio || '');
+      // For bio, we might handle it from a custom field
+      setPersonalValue('bio', profileData?.bio || ''); // Default to empty if not available
       
       // Fetch business details
       const { data: businessData, error: businessError } = await supabase
