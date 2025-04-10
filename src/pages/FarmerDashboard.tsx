@@ -39,12 +39,13 @@ const FarmerDashboard = () => {
           .select('*')
           .eq('farmer_id', profile.id);
 
-        // Fetch active auctions
+        // Fetch active auctions - updated to check for inactive status with auction_id
         const { data: auctions } = await supabase
           .from('products')
           .select('*')
           .eq('farmer_id', profile.id)
-          .eq('status', 'in_auction');
+          .eq('status', 'inactive')
+          .not('auction_id', 'is', null);
 
         // Fetch total revenue from completed orders
         const { data: orders } = await supabase
@@ -53,12 +54,12 @@ const FarmerDashboard = () => {
           .eq('farmer_id', profile.id)
           .eq('status', 'completed');
 
-        // Fetch pending orders
+        // Fetch pending orders - updated to include all relevant statuses
         const { data: pendingOrders } = await supabase
           .from('orders')
           .select('*')
           .eq('farmer_id', profile.id)
-          .eq('status', 'pending');
+          .in('status', ['pending', 'confirmed', 'processing', 'shipped']);
 
         // Calculate monthly revenue
         const monthlyRevenue = orders ? calculateMonthlyRevenue(orders) : [];
@@ -69,7 +70,7 @@ const FarmerDashboard = () => {
         setDashboardData({
           totalProducts: products?.length || 0,
           activeAuctions: auctions?.length || 0,
-          totalRevenue: orders?.reduce((sum, order) => sum + order.total_amount, 0) || 0,
+          totalRevenue: orders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0,
           pendingOrders: pendingOrders?.length || 0,
           recentProducts: products?.slice(0, 3) || [],
           monthlyRevenue,
