@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -48,7 +49,7 @@ export const useBusinessData = (userId?: string) => {
         try {
           const params: GetBusinessExtendedDataParams = { b_id: businessData.id || '' };
           const { data, error: extBusinessError } = await supabase
-            .rpc<BusinessExtendedDataResponse>('get_business_extended_data', params);
+            .rpc<BusinessExtendedDataResponse, GetBusinessExtendedDataParams>('get_business_extended_data', params);
             
           if (!extBusinessError && data) {
             const extendedData: ExtendedBusinessData = {
@@ -173,7 +174,7 @@ export const useBusinessData = (userId?: string) => {
           };
           
           await supabase
-            .rpc<RPCVoidResponse>('update_business_extended_data', params);
+            .rpc<RPCVoidResponse, UpdateBusinessExtendedDataParams>('update_business_extended_data', params);
           
           const extendedData: ExtendedBusinessData = {
             designation: data.designation,
@@ -214,7 +215,7 @@ export const useBusinessData = (userId?: string) => {
             };
             
             await supabase
-              .rpc<RPCVoidResponse>('update_business_extended_data', params);
+              .rpc<RPCVoidResponse, UpdateBusinessExtendedDataParams>('update_business_extended_data', params);
             
             const extendedData: ExtendedBusinessData = {
               designation: data.designation,
