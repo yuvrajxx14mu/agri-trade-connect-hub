@@ -16,7 +16,6 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
-import { Json } from "@/integrations/supabase/types";
 
 interface ProfileFormData {
   firstName: string;
@@ -77,6 +76,8 @@ const TraderProfile = () => {
   const [savingCompany, setSavingCompany] = useState(false);
   const [extendedProfile, setExtendedProfile] = useState<ExtendedProfileData | null>(null);
   const [businessDetails, setBusinessDetails] = useState<BusinessDetails | null>(null);
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profileBio, setProfileBio] = useState("");
   
   const {
     register: registerPersonal,
@@ -110,20 +111,23 @@ const TraderProfile = () => {
       
       if (profileError) throw profileError;
 
-      // Fetch additional profile data if needed
-      const { data: extendedProfileData, error: extendedProfileError } = await supabase
-        .rpc('get_extended_profile_data', { user_id: profile?.id });
-
-      if (!extendedProfileError && extendedProfileData) {
-        setExtendedProfile({
-          ...profileData,
-          bio: extendedProfileData.bio || ''
-        });
-      } else {
-        setExtendedProfile({
-          ...profileData,
-          bio: ''
-        });
+      // Set the extended profile with default empty bio
+      setExtendedProfile({
+        ...profileData,
+        bio: ""
+      });
+      
+      // Fetch bio from another function or table if needed
+      try {
+        const { data: extendedData, error: extendedError } = await supabase
+          .rpc('get_trader_bio', { user_id: profile?.id });
+        
+        if (!extendedError && extendedData) {
+          setProfileBio(extendedData || "");
+        }
+      } catch (bioError) {
+        console.error('Bio data not available:', bioError);
+        setProfileBio("");
       }
       
       // Populate personal form data
@@ -138,9 +142,13 @@ const TraderProfile = () => {
       
       if (userError) throw userError;
       
-      setPersonalValue('email', userData.user?.email || '');
-      // For bio, we might handle it from a custom field
-      setPersonalValue('bio', extendedProfile?.bio || ''); // Default to empty if not available
+      if (userData?.user?.email) {
+        setProfileEmail(userData.user.email);
+        setPersonalValue('email', userData.user.email);
+      }
+      
+      // Set bio in form
+      setPersonalValue('bio', profileBio); 
       
       // Fetch business details
       const { data: businessData, error: businessError } = await supabase
@@ -150,24 +158,76 @@ const TraderProfile = () => {
         .single();
       
       if (!businessError && businessData) {
-        // Create a complete business details object with default values for missing fields
-        const completeBusinessData: BusinessDetails = {
-          ...businessData,
-          designation: businessData.designation || 'Director of Procurement',
-          business_description: businessData.business_description || '',
-          operational_areas: businessData.operational_areas || ''
-        };
-        
-        setBusinessDetails(completeBusinessData);
-        
-        // Populate business form data
-        setCompanyValue('companyName', completeBusinessData.business_name || '');
-        setCompanyValue('designation', completeBusinessData.designation || 'Director of Procurement');
-        setCompanyValue('gstin', completeBusinessData.gst_number || '');
-        setCompanyValue('tradeLicense', completeBusinessData.registration_number || '');
-        setCompanyValue('companyAddress', completeBusinessData.business_address || '');
-        setCompanyValue('businessDescription', completeBusinessData.business_description || '');
-        setCompanyValue('operationalAreas', completeBusinessData.operational_areas || '');
+        // Get additional business fields if available
+        try {
+          const { data: extendedBusinessData, error: extBusinessError } = await supabase
+            .rpc('get_business_extended_data', { b_id: businessData.id });
+            
+          if (!extBusinessError && extendedBusinessData) {
+            // Add extended fields to business data
+            const enhancedBusinessData: BusinessDetails = {
+              ...businessData,
+              designation: extendedBusinessData.designation || 'Director of Procurement',
+              business_description: extendedBusinessData.description || '',
+              operational_areas: extendedBusinessData.areas || ''
+            };
+            
+            setBusinessDetails(enhancedBusinessData);
+            
+            // Populate business form
+            setCompanyValue('companyName', enhancedBusinessData.business_name || '');
+            setCompanyValue('designation', enhancedBusinessData.designation || '');
+            setCompanyValue('gstin', enhancedBusinessData.gst_number || '');
+            setCompanyValue('tradeLicense', enhancedBusinessData.registration_number || '');
+            setCompanyValue('companyAddress', enhancedBusinessData.business_address || '');
+            setCompanyValue('businessDescription', enhancedBusinessData.business_description || '');
+            setCompanyValue('operationalAreas', enhancedBusinessData.operational_areas || '');
+          } else {
+            // Use default values if extended data not available
+            setBusinessDetails({
+              ...businessData,
+              designation: 'Director of Procurement',
+              business_description: '',
+              operational_areas: ''
+            });
+            
+            setCompanyValue('companyName', businessData.business_name || '');
+            setCompanyValue('designation', 'Director of Procurement');
+            setCompanyValue('gstin', businessData.gst_number || '');
+            setCompanyValue('tradeLicense', businessData.registration_number || '');
+            setCompanyValue('companyAddress', businessData.business_address || '');
+            setCompanyValue('businessDescription', '');
+            setCompanyValue('operationalAreas', '');
+          }
+        } catch (extError) {
+          console.error('Error fetching extended business data:', extError);
+          
+          // Default values if extended business data fails
+          setBusinessDetails({
+            ...businessData,
+            designation: 'Director of Procurement',
+            business_description: '',
+            operational_areas: ''
+          });
+          
+          setCompanyValue('companyName', businessData.business_name || '');
+          setCompanyValue('designation', 'Director of Procurement');
+          setCompanyValue('gstin', businessData.gst_number || '');
+          setCompanyValue('tradeLicense', businessData.registration_number || '');
+          setCompanyValue('companyAddress', businessData.business_address || '');
+          setCompanyValue('businessDescription', '');
+          setCompanyValue('operationalAreas', '');
+        }
+      } else {
+        // Set defaults for new business
+        setBusinessDetails(null);
+        setCompanyValue('companyName', '');
+        setCompanyValue('designation', 'Director of Procurement');
+        setCompanyValue('gstin', '');
+        setCompanyValue('tradeLicense', '');
+        setCompanyValue('companyAddress', '');
+        setCompanyValue('businessDescription', '');
+        setCompanyValue('operationalAreas', '');
       }
       
     } catch (error) {
@@ -202,11 +262,17 @@ const TraderProfile = () => {
       
       if (error) throw error;
       
-      // Update bio in a separate table or via RPC function
-      await supabase.rpc('update_trader_bio', { 
-        user_id: profile.id, 
-        bio_text: data.bio 
-      });
+      // Update bio in a separate table or via RPC function if available
+      try {
+        await supabase.rpc('update_trader_bio', { 
+          user_id: profile.id, 
+          bio_text: data.bio 
+        });
+        setProfileBio(data.bio);
+      } catch (bioError) {
+        console.error('Error updating bio:', bioError);
+        // Create a function to handle bio if it doesn't exist
+      }
       
       // Update local auth context
       updateProfile({
@@ -265,16 +331,21 @@ const TraderProfile = () => {
         
         if (error) throw error;
         
-        // Update additional fields via RPC function
-        await supabase.rpc('update_business_extended_data', { 
-          business_id: businessDetails.id, 
-          designation_text: data.designation,
-          description_text: data.businessDescription,
-          areas_text: data.operationalAreas
-        });
+        // Update additional fields via RPC function if available
+        try {
+          await supabase.rpc('update_business_extended_data', { 
+            business_id: businessDetails.id, 
+            designation_text: data.designation,
+            description_text: data.businessDescription,
+            areas_text: data.operationalAreas
+          });
+        } catch (extError) {
+          console.error('Error updating extended business data:', extError);
+          // Create a function to handle extended data if it doesn't exist
+        }
       } else {
         // Create new business details
-        const { error } = await supabase
+        const { data: newBusiness, error } = await supabase
           .from('business_details')
           .insert({
             user_id: profile.id,
@@ -283,28 +354,27 @@ const TraderProfile = () => {
             business_address: data.companyAddress,
             gst_number: data.gstin,
             registration_number: data.tradeLicense
-          });
+          })
+          .select();
         
         if (error) throw error;
         
-        // Refresh business details
-        const { data: newBusinessData } = await supabase
-          .from('business_details')
-          .select('*')
-          .eq('user_id', profile.id)
-          .single();
-        
-        if (newBusinessData) {
-          // Update extended data
-          await supabase.rpc('update_business_extended_data', { 
-            business_id: newBusinessData.id, 
-            designation_text: data.designation,
-            description_text: data.businessDescription,
-            areas_text: data.operationalAreas
-          });
+        if (newBusiness && newBusiness.length > 0) {
+          // Update extended data if function exists
+          try {
+            await supabase.rpc('update_business_extended_data', { 
+              business_id: newBusiness[0].id, 
+              designation_text: data.designation,
+              description_text: data.businessDescription,
+              areas_text: data.operationalAreas
+            });
+          } catch (extError) {
+            console.error('Extended business data function not available:', extError);
+            // Create a function to handle extended data if it doesn't exist
+          }
           
           setBusinessDetails({
-            ...newBusinessData,
+            ...newBusiness[0],
             designation: data.designation,
             business_description: data.businessDescription,
             operational_areas: data.operationalAreas
@@ -377,7 +447,7 @@ const TraderProfile = () => {
                 </div>
                 <div className="flex items-center text-sm">
                   <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span>{profile?.email || "Not specified"}</span>
+                  <span>{profileEmail || "Not specified"}</span>
                 </div>
                 <div className="flex items-center text-sm">
                   <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />

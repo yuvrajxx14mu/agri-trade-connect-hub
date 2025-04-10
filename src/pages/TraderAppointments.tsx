@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -90,23 +89,30 @@ const TraderAppointments = () => {
     try {
       setIsLoading(true);
       
-      // Modified query to properly join with the profiles table
-      const { data, error } = await supabase
+      // First, get all appointments for the trader
+      const { data: appointmentsData, error: appointmentsError } = await supabase
         .from('appointments')
-        .select(`
-          *,
-          farmer:farmer_id(id, name)
-        `)
+        .select('*')
         .eq('trader_id', profile.id)
         .order('appointment_date', { ascending: true });
       
-      if (error) throw error;
+      if (appointmentsError) throw appointmentsError;
       
-      // Format the appointments with farmer name
-      const formattedAppointments = data.map(appointment => ({
-        ...appointment,
-        farmer_name: appointment.farmer ? appointment.farmer.name : "Unknown Farmer"
-      }));
+      // Then, for each appointment, get the farmer's name
+      const formattedAppointments = await Promise.all(
+        (appointmentsData || []).map(async (appointment) => {
+          const { data: farmerData, error: farmerError } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', appointment.farmer_id)
+            .single();
+          
+          return {
+            ...appointment,
+            farmer_name: farmerError ? "Unknown Farmer" : farmerData.name
+          };
+        })
+      );
       
       setAppointments(formattedAppointments || []);
     } catch (error) {
