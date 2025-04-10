@@ -119,8 +119,13 @@ const TraderProfile = () => {
     }
   });
   
-  const setPersonalValue = personalForm.setValue;
-  const setCompanyValue = companyForm.setValue;
+  const setPersonalValue = (field: keyof ProfileFormData, value: string) => {
+    personalForm.setValue(field, value);
+  };
+  
+  const setCompanyValue = (field: keyof CompanyFormData, value: string) => {
+    companyForm.setValue(field, value);
+  };
   
   useEffect(() => {
     if (profile?.id) {
