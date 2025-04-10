@@ -3,18 +3,29 @@ import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Redirect authenticated users to their dashboard
     if (!loading && user && profile) {
       const redirectPath = profile.role === "farmer" ? "/farmer-dashboard" : "/trader-dashboard";
       navigate(redirectPath);
     }
   }, [user, profile, loading, navigate]);
 
+  // Show loading spinner while checking auth
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
   return (
     <div className="flex flex-col min-h-screen">
       <header className="px-4 py-4 border-b sm:px-6">

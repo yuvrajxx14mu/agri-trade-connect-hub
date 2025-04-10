@@ -12,10 +12,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 const AuthForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn, signUp } = useAuth();
   const [activeTab, setActiveTab] = useState<"signin" | "signup">("signin");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,25 +40,8 @@ const AuthForm = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: signinEmail,
-        password: signinPassword,
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        // Get user profile to determine role
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
-
-        const userRole = profileData?.role || 'farmer';
-        const redirectPath = userRole === 'farmer' ? '/farmer-dashboard' : '/trader-dashboard';
-        navigate(redirectPath);
-      }
+      await signIn(signinEmail, signinPassword);
+      // The redirect will be handled by the auth state change in context
     } catch (error: any) {
       setError(error.message || "Failed to sign in");
     } finally {
@@ -82,20 +67,8 @@ const AuthForm = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: signupEmail,
-        password: signupPassword,
-        options: {
-          data: {
-            name,
-            phone,
-            role,
-          }
-        }
-      });
-
-      if (error) throw error;
-
+      await signUp(signupEmail, signupPassword, name, role, phone);
+      
       toast({
         title: "Account created successfully",
         description: "Please check your email to verify your account",

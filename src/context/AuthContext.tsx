@@ -106,6 +106,11 @@ const AuthProviderContent = ({
       if (error) throw error;
       
       // User will be set by the onAuthStateChange listener
+      const roleRedirect = data.user?.user_metadata?.role === 'farmer' 
+        ? '/farmer-dashboard' 
+        : '/trader-dashboard';
+      
+      navigate(roleRedirect);
     } catch (error) {
       throw error;
     }
@@ -139,7 +144,7 @@ const AuthProviderContent = ({
       if (error) throw error;
       
       // User will be cleared by the onAuthStateChange listener
-      navigate('/login');
+      navigate('/auth');
     } catch (error) {
       console.error('Error signing out:', error);
     }
