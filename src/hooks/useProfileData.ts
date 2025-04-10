@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -46,8 +47,14 @@ export const useProfileData = (userId?: string) => {
       
       try {
         const params: GetTraderBioParams = { user_id: userId };
-        const { data, error: extendedError } = await (supabase
-          .rpc('get_trader_bio', params) as any);
+        
+        // Create a properly typed version of rpc for this specific call
+        const rpcCall = supabase.rpc as unknown as (
+          fn: string, 
+          params: GetTraderBioParams
+        ) => Promise<{ data: TraderBioResponse | null; error: any }>
+        
+        const { data, error: extendedError } = await rpcCall('get_trader_bio', params);
         
         if (!extendedError && data) {
           const bioResponse = data as TraderBioResponse;
@@ -115,8 +122,13 @@ export const useProfileData = (userId?: string) => {
           bio_text: data.bio 
         };
         
-        const { error: bioError } = await (supabase
-          .rpc('update_trader_bio', params) as any);
+        // Create a properly typed version of rpc for this specific call
+        const rpcCall = supabase.rpc as unknown as (
+          fn: string, 
+          params: UpdateTraderBioParams
+        ) => Promise<{ data: RPCVoidResponse | null; error: any }>
+        
+        const { error: bioError } = await rpcCall('update_trader_bio', params);
         
         if (!bioError) {
           setProfileBio(data.bio);
