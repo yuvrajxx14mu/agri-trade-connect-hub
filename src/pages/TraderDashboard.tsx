@@ -34,22 +34,49 @@ const TraderDashboard = () => {
       if (!profile?.id) return;
 
       try {
-        // Fetch active auctions
-        const { data: auctions } = await supabase
-          .from('products')
+        // Fetch active auctions with proper joins and filters
+        const { data: auctions, error: auctionsError } = await supabase
+          .from('auctions')
           .select(`
             id,
-            name,
-            quantity,
-            unit,
-            price,
-            status,
-            farmer_id,
-            profiles(name)
+            current_price,
+            end_time,
+            product_id,
+            products!auctions_product_id_fkey (
+              id,
+              name,
+              quantity,
+              unit,
+              farmer_name,
+              location,
+              category
+            )
           `)
-          .eq('status', 'in_auction')
+          .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(4);
+
+        if (auctionsError) {
+          console.error('Error fetching auctions:', auctionsError);
+          throw auctionsError;
+        }
+
+        // Process auctions data with proper null checks
+        const processedAuctions = (auctions || [])
+          .filter(auction => auction.products) // Ensure product data exists
+          .map(auction => ({
+            id: auction.id,
+            name: auction.products.name,
+            quantity: auction.products.quantity,
+            unit: auction.products.unit,
+            price: auction.current_price,
+            location: auction.products.location,
+            category: auction.products.category,
+            end_time: auction.end_time,
+            profiles: {
+              name: auction.products.farmer_name
+            }
+          }));
 
         // Fetch orders statistics
         const { data: orders } = await supabase
@@ -84,7 +111,7 @@ const TraderDashboard = () => {
         const recentOrders = orders?.slice(0, 3) || [];
 
         setDashboardData({
-          activeAuctions: auctions || [],
+          activeAuctions: processedAuctions,
           productCategories,
           totalOrders,
           totalRevenue,
