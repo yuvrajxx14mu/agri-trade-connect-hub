@@ -39,6 +39,16 @@ interface ExtendedBusinessData {
   areas: string;
 }
 
+interface TraderBioResponse {
+  bio_text?: string;
+}
+
+interface BusinessExtendedDataResponse {
+  designation?: string;
+  description?: string;
+  areas?: string;
+}
+
 export const useTraderProfile = () => {
   const { profile, updateProfile } = useAuth();
   const { toast } = useToast();
@@ -91,11 +101,11 @@ export const useTraderProfile = () => {
       });
       
       try {
-        const { data: extendedData, error: extendedError } = await supabase
-          .rpc('get_trader_bio', { user_id: profile.id });
+        const { data, error: extendedError } = await supabase
+          .rpc<TraderBioResponse>('get_trader_bio', { user_id: profile.id });
         
-        if (!extendedError && extendedData) {
-          setProfileBio(extendedData || "");
+        if (!extendedError && data) {
+          setProfileBio(data.bio_text || "");
         }
       } catch (bioError) {
         console.error('Bio data not available:', bioError);
@@ -133,14 +143,14 @@ export const useTraderProfile = () => {
         setBusinessDetails(businessData);
         
         try {
-          const { data: extBizData, error: extBusinessError } = await supabase
-            .rpc('get_business_extended_data', { b_id: businessData.id });
+          const { data, error: extBusinessError } = await supabase
+            .rpc<BusinessExtendedDataResponse>('get_business_extended_data', { b_id: businessData.id });
             
-          if (!extBusinessError && extBizData) {
+          if (!extBusinessError && data) {
             const extendedData: ExtendedBusinessData = {
-              designation: extBizData.designation || 'Director of Procurement',
-              description: extBizData.description || '',
-              areas: extBizData.areas || ''
+              designation: data.designation || 'Director of Procurement',
+              description: data.description || '',
+              areas: data.areas || ''
             };
             setExtendedBusinessData(extendedData);
             
