@@ -168,7 +168,8 @@ export const useBusinessData = (userId?: string) => {
             designation_text: data.designation,
             description_text: data.businessDescription,
             areas_text: data.operationalAreas
-          });
+          })
+          .returns<void>();
           
           const extendedData: ExtendedBusinessData = {
             designation: data.designation,
@@ -207,7 +208,8 @@ export const useBusinessData = (userId?: string) => {
               designation_text: data.designation,
               description_text: data.businessDescription,
               areas_text: data.operationalAreas
-            });
+            })
+            .returns<void>();
             
             const extendedData: ExtendedBusinessData = {
               designation: data.designation,

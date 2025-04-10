@@ -106,7 +106,9 @@ export const useProfileData = (userId?: string) => {
         await supabase.rpc('update_trader_bio', { 
           user_id: userId, 
           bio_text: data.bio 
-        });
+        })
+        .returns<void>();
+        
         setProfileBio(data.bio);
       } catch (bioError) {
         console.error('Error updating bio:', bioError);

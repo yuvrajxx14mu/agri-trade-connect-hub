@@ -4,7 +4,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useProfileData } from "./useProfileData";
 import { useBusinessData } from "./useBusinessData";
 import { ProfileFormData } from "@/types/trader";
-import { CompanyFormData } from "@/types/trader";
 
 export const useTraderProfile = () => {
   const { profile, updateProfile } = useAuth();
