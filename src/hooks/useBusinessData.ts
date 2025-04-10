@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -49,14 +48,13 @@ export const useBusinessData = (userId?: string) => {
         try {
           const params: GetBusinessExtendedDataParams = { b_id: businessData.id || '' };
           const { data, error: extBusinessError } = await supabase
-            .rpc('get_business_extended_data', params);
+            .rpc<BusinessExtendedDataResponse>('get_business_extended_data', params);
             
           if (!extBusinessError && data) {
-            const extData = data as BusinessExtendedDataResponse;
             const extendedData: ExtendedBusinessData = {
-              designation: extData.designation || 'Director of Procurement',
-              description: extData.description || '',
-              areas: extData.areas || ''
+              designation: data.designation || 'Director of Procurement',
+              description: data.description || '',
+              areas: data.areas || ''
             };
             setExtendedBusinessData(extendedData);
             
@@ -175,7 +173,7 @@ export const useBusinessData = (userId?: string) => {
           };
           
           await supabase
-            .rpc('update_business_extended_data', params);
+            .rpc<RPCVoidResponse>('update_business_extended_data', params);
           
           const extendedData: ExtendedBusinessData = {
             designation: data.designation,
@@ -216,7 +214,7 @@ export const useBusinessData = (userId?: string) => {
             };
             
             await supabase
-              .rpc('update_business_extended_data', params);
+              .rpc<RPCVoidResponse>('update_business_extended_data', params);
             
             const extendedData: ExtendedBusinessData = {
               designation: data.designation,
