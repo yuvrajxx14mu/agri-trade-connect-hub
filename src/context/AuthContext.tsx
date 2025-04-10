@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,13 +24,12 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string, role: "farmer" | "trader", phone?: string) => Promise<void>;
   signOut: () => Promise<void>;
   loading: boolean;
-  isLoading: boolean; // Add isLoading property
+  isLoading: boolean;
   updateProfile: (newProfileData: Partial<Profile>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Create a component that doesn't use useNavigate
 const AuthProviderContent = ({ 
   children, 
   navigate 
@@ -43,41 +41,10 @@ const AuthProviderContent = ({
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log("Auth state changed:", event);
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
-        }
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      }
-      
-      setLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+  const [initialized, setInitialized] = useState(false);
 
   const fetchProfile = async (userId: string) => {
+    console.log("Fetching profile for user:", userId);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -87,37 +54,136 @@ const AuthProviderContent = ({
 
       if (error) {
         console.error('Error fetching profile:', error);
-        return;
+        return null;
       }
 
-      setProfile(data as Profile);
+      console.log("Profile fetched successfully:", data);
+      return data as Profile;
     } catch (error) {
       console.error('Error fetching profile:', error);
+      return null;
     }
   };
 
+  const handleAuthStateChange = async (event: string, currentSession: Session | null) => {
+    console.log("Auth state changed:", event, "Session:", currentSession?.user?.email);
+    
+    try {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      
+      if (currentSession?.user) {
+        console.log("Fetching profile for authenticated user");
+        const profileData = await fetchProfile(currentSession.user.id);
+        if (profileData) {
+          console.log("Setting profile:", profileData);
+          setProfile(profileData);
+        } else {
+          console.log("No profile data found, creating basic profile");
+          // If no profile is found but we have a session, create a basic profile
+          const basicProfile = {
+            id: currentSession.user.id,
+            name: currentSession.user.user_metadata?.name || "User",
+            role: currentSession.user.user_metadata?.role || "farmer",
+            email: currentSession.user.email,
+          };
+          setProfile(basicProfile as Profile);
+          
+          // Create the profile in the database
+          const { error } = await supabase
+            .from('profiles')
+            .insert([basicProfile]);
+            
+          if (error) {
+            console.error('Error creating profile:', error);
+          }
+        }
+      } else {
+        console.log("No session, clearing profile");
+        setProfile(null);
+      }
+    } catch (error) {
+      console.error("Error in handleAuthStateChange:", error);
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    
+    const initializeAuth = async () => {
+      console.log("Initializing auth...");
+      try {
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting initial session:', error);
+          if (mounted) {
+            setLoading(false);
+            setInitialized(true);
+          }
+          return;
+        }
+
+        if (mounted) {
+          console.log("Initial session:", initialSession?.user?.email);
+          await handleAuthStateChange('INITIAL_SESSION', initialSession);
+          setInitialized(true);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error during auth initialization:', error);
+        if (mounted) {
+          setLoading(false);
+          setInitialized(true);
+        }
+      }
+    };
+
+    // Initialize auth first
+    initializeAuth();
+
+    // Set up auth state listener after initialization
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log("Auth state change event:", event);
+      if (mounted && initialized) { // Only handle auth changes after initialization
+        setLoading(true);
+        await handleAuthStateChange(event, currentSession);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      console.log("Cleaning up auth effect");
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const signIn = async (email: string, password: string) => {
     try {
+      setLoading(true);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
-      
-      // User will be set by the onAuthStateChange listener
+
+      // Auth state change listener will handle session update
       const roleRedirect = data.user?.user_metadata?.role === 'farmer' 
         ? '/farmer-dashboard' 
         : '/trader-dashboard';
       
       navigate(roleRedirect);
     } catch (error) {
+      setLoading(false);
       throw error;
     }
   };
 
   const signUp = async (email: string, password: string, name: string, role: "farmer" | "trader", phone?: string) => {
     try {
+      setLoading(true);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -132,21 +198,29 @@ const AuthProviderContent = ({
 
       if (error) throw error;
       
-      // User will be set by the onAuthStateChange listener
+      // Auth state change listener will handle session update
     } catch (error) {
+      setLoading(false);
       throw error;
     }
   };
 
   const signOut = async () => {
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
-      // User will be cleared by the onAuthStateChange listener
+      // Clear all auth state
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      
       navigate('/auth');
     } catch (error) {
       console.error('Error signing out:', error);
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -159,6 +233,17 @@ const AuthProviderContent = ({
     });
   };
 
+  // Show loading spinner while initializing
+  if (!initialized) {
+    console.log("Waiting for auth initialization...");
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+        <span className="ml-3">Initializing...</span>
+      </div>
+    );
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -169,7 +254,7 @@ const AuthProviderContent = ({
         signUp,
         signOut,
         loading,
-        isLoading: loading, // Set isLoading to match loading state
+        isLoading: loading,
         updateProfile
       }}
     >
@@ -178,14 +263,11 @@ const AuthProviderContent = ({
   );
 };
 
-// Create a wrapper component that uses useNavigate
 export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  // This is a wrapper to prevent the useNavigate call until we know we're in a Router context
   try {
     const navigate = useReactRouterNavigate();
     return <AuthProviderContent navigate={navigate}>{children}</AuthProviderContent>;
   } catch (error) {
-    // If useNavigate fails, use a fallback that just logs the intent to navigate
     console.warn("Router not available, navigation will be logged but not performed");
     const fallbackNavigate = (path: string) => console.log(`Navigation intended to: ${path}`);
     return <AuthProviderContent navigate={fallbackNavigate}>{children}</AuthProviderContent>;
