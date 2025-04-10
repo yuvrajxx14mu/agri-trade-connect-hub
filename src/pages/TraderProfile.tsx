@@ -17,6 +17,15 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
+import { 
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from "@/components/ui/form";
 
 interface ProfileFormData {
   firstName: string;
@@ -65,9 +74,9 @@ interface BusinessDetails {
 }
 
 interface ExtendedBusinessData {
-  designation?: string;
-  description?: string;
-  areas?: string;
+  designation: string;
+  description: string;
+  areas: string;
 }
 
 const TraderProfile = () => {
@@ -80,23 +89,39 @@ const TraderProfile = () => {
   const [savingCompany, setSavingCompany] = useState(false);
   const [extendedProfile, setExtendedProfile] = useState<ExtendedProfileData | null>(null);
   const [businessDetails, setBusinessDetails] = useState<BusinessDetails | null>(null);
-  const [extendedBusinessData, setExtendedBusinessData] = useState<ExtendedBusinessData | null>(null);
+  const [extendedBusinessData, setExtendedBusinessData] = useState<ExtendedBusinessData>({
+    designation: 'Director of Procurement',
+    description: '',
+    areas: ''
+  });
   const [profileEmail, setProfileEmail] = useState("");
   const [profileBio, setProfileBio] = useState("");
   
-  const {
-    register: registerPersonal,
-    handleSubmit: handleSubmitPersonal,
-    setValue: setPersonalValue,
-    formState: { errors: personalErrors }
-  } = useForm<ProfileFormData>();
+  const personalForm = useForm<ProfileFormData>({
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      address: '',
+      bio: ''
+    }
+  });
   
-  const {
-    register: registerCompany,
-    handleSubmit: handleSubmitCompany,
-    setValue: setCompanyValue,
-    formState: { errors: companyErrors }
-  } = useForm<CompanyFormData>();
+  const companyForm = useForm<CompanyFormData>({
+    defaultValues: {
+      companyName: '',
+      designation: 'Director of Procurement',
+      gstin: '',
+      tradeLicense: '',
+      companyAddress: '',
+      businessDescription: '',
+      operationalAreas: ''
+    }
+  });
+  
+  const setPersonalValue = personalForm.setValue;
+  const setCompanyValue = companyForm.setValue;
   
   useEffect(() => {
     if (profile?.id) {
@@ -170,23 +195,24 @@ const TraderProfile = () => {
             
           if (!extBusinessError && extBizData) {
             // Store extended fields
-            setExtendedBusinessData({
+            const extendedData: ExtendedBusinessData = {
               designation: extBizData.designation || 'Director of Procurement',
               description: extBizData.description || '',
               areas: extBizData.areas || ''
-            });
+            };
+            setExtendedBusinessData(extendedData);
             
             // Populate business form with both standard and extended data
             setCompanyValue('companyName', businessData.business_name || '');
-            setCompanyValue('designation', extBizData.designation || 'Director of Procurement');
+            setCompanyValue('designation', extendedData.designation);
             setCompanyValue('gstin', businessData.gst_number || '');
             setCompanyValue('tradeLicense', businessData.registration_number || '');
             setCompanyValue('companyAddress', businessData.business_address || '');
-            setCompanyValue('businessDescription', extBizData.description || '');
-            setCompanyValue('operationalAreas', extBizData.areas || '');
+            setCompanyValue('businessDescription', extendedData.description);
+            setCompanyValue('operationalAreas', extendedData.areas);
           } else {
             // Use default values if extended data not available
-            const defaultExtendedData = {
+            const defaultExtendedData: ExtendedBusinessData = {
               designation: 'Director of Procurement',
               description: '',
               areas: ''
@@ -205,7 +231,7 @@ const TraderProfile = () => {
           console.error('Error fetching extended business data:', extError);
           
           // Default values if extended business data fails
-          const fallbackExtendedData = {
+          const fallbackExtendedData: ExtendedBusinessData = {
             designation: 'Director of Procurement',
             description: '',
             areas: ''
@@ -223,7 +249,7 @@ const TraderProfile = () => {
       } else {
         // Set defaults for new business
         setBusinessDetails(null);
-        const defaultNewBusinessData = {
+        const defaultNewBusinessData: ExtendedBusinessData = {
           designation: 'Director of Procurement',
           description: '',
           areas: ''
@@ -504,21 +530,21 @@ const TraderProfile = () => {
                   <CardDescription>Update your personal details</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form className="space-y-6" onSubmit={handleSubmitPersonal(onPersonalSubmit)}>
+                  <form className="space-y-6" onSubmit={personalForm.handleSubmit(onPersonalSubmit)}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="firstName">First Name</Label>
                         <Input 
                           id="firstName" 
-                          {...registerPersonal('firstName', { required: true })} 
+                          {...personalForm.register('firstName', { required: true })} 
                         />
-                        {personalErrors.firstName && <p className="text-sm text-red-500">First name is required</p>}
+                        {personalForm.formState.errors.firstName && <p className="text-sm text-red-500">First name is required</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="lastName">Last Name</Label>
                         <Input 
                           id="lastName" 
-                          {...registerPersonal('lastName')} 
+                          {...personalForm.register('lastName')} 
                         />
                       </div>
                     </div>
@@ -530,7 +556,7 @@ const TraderProfile = () => {
                           id="email" 
                           type="email" 
                           disabled
-                          {...registerPersonal('email')} 
+                          {...personalForm.register('email')} 
                         />
                         <p className="text-xs text-muted-foreground">Contact support to change email</p>
                       </div>
@@ -538,7 +564,7 @@ const TraderProfile = () => {
                         <Label htmlFor="phone">Phone Number</Label>
                         <Input 
                           id="phone" 
-                          {...registerPersonal('phone')} 
+                          {...personalForm.register('phone')} 
                         />
                       </div>
                     </div>
@@ -547,7 +573,7 @@ const TraderProfile = () => {
                       <Label htmlFor="address">Residential Address</Label>
                       <Textarea 
                         id="address" 
-                        {...registerPersonal('address')} 
+                        {...personalForm.register('address')} 
                       />
                     </div>
                     
@@ -555,7 +581,7 @@ const TraderProfile = () => {
                       <Label htmlFor="bio">Professional Bio</Label>
                       <Textarea 
                         id="bio" 
-                        {...registerPersonal('bio')} 
+                        {...personalForm.register('bio')} 
                       />
                     </div>
                     
@@ -590,21 +616,21 @@ const TraderProfile = () => {
                   <CardDescription>Information about your trading business</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form className="space-y-6" onSubmit={handleSubmitCompany(onCompanySubmit)}>
+                  <form className="space-y-6" onSubmit={companyForm.handleSubmit(onCompanySubmit)}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="companyName">Company Name</Label>
                         <Input 
                           id="companyName" 
-                          {...registerCompany('companyName', { required: true })} 
+                          {...companyForm.register('companyName', { required: true })} 
                         />
-                        {companyErrors.companyName && <p className="text-sm text-red-500">Company name is required</p>}
+                        {companyForm.formState.errors.companyName && <p className="text-sm text-red-500">Company name is required</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="designation">Your Designation</Label>
                         <Input 
                           id="designation" 
-                          {...registerCompany('designation')} 
+                          {...companyForm.register('designation')} 
                         />
                       </div>
                     </div>
@@ -614,14 +640,14 @@ const TraderProfile = () => {
                         <Label htmlFor="gstin">GSTIN Number</Label>
                         <Input 
                           id="gstin" 
-                          {...registerCompany('gstin')} 
+                          {...companyForm.register('gstin')} 
                         />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="tradeLicense">Trade License Number</Label>
                         <Input 
                           id="tradeLicense" 
-                          {...registerCompany('tradeLicense')} 
+                          {...companyForm.register('tradeLicense')} 
                         />
                       </div>
                     </div>
@@ -630,7 +656,7 @@ const TraderProfile = () => {
                       <Label htmlFor="companyAddress">Company Address</Label>
                       <Textarea 
                         id="companyAddress" 
-                        {...registerCompany('companyAddress')} 
+                        {...companyForm.register('companyAddress')} 
                       />
                     </div>
                     
@@ -638,7 +664,7 @@ const TraderProfile = () => {
                       <Label htmlFor="businessDescription">Business Description</Label>
                       <Textarea 
                         id="businessDescription" 
-                        {...registerCompany('businessDescription')} 
+                        {...companyForm.register('businessDescription')} 
                       />
                     </div>
                     
@@ -646,7 +672,7 @@ const TraderProfile = () => {
                       <Label htmlFor="operationalAreas">Operational Areas</Label>
                       <Input 
                         id="operationalAreas" 
-                        {...registerCompany('operationalAreas')} 
+                        {...companyForm.register('operationalAreas')} 
                         placeholder="e.g. Maharashtra, Gujarat, Punjab" 
                       />
                     </div>
