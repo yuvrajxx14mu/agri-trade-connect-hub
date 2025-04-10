@@ -48,10 +48,11 @@ export const useProfileData = (userId?: string) => {
       try {
         const params: GetTraderBioParams = { user_id: userId };
         const { data, error: extendedError } = await supabase
-          .rpc<TraderBioResponse>('get_trader_bio', params);
+          .rpc('get_trader_bio', params);
         
         if (!extendedError && data) {
-          setProfileBio(data.bio_text || "");
+          const bioData = data as TraderBioResponse;
+          setProfileBio(bioData.bio_text || "");
         }
       } catch (bioError) {
         console.error('Bio data not available:', bioError);
@@ -116,7 +117,7 @@ export const useProfileData = (userId?: string) => {
         };
         
         await supabase
-          .rpc<RPCVoidResponse>('update_trader_bio', params);
+          .rpc('update_trader_bio', params);
         
         setProfileBio(data.bio);
       } catch (bioError) {

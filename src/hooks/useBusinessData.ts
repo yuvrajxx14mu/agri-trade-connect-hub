@@ -49,13 +49,14 @@ export const useBusinessData = (userId?: string) => {
         try {
           const params: GetBusinessExtendedDataParams = { b_id: businessData.id || '' };
           const { data, error: extBusinessError } = await supabase
-            .rpc<BusinessExtendedDataResponse>('get_business_extended_data', params);
+            .rpc('get_business_extended_data', params);
             
           if (!extBusinessError && data) {
+            const extData = data as BusinessExtendedDataResponse;
             const extendedData: ExtendedBusinessData = {
-              designation: data.designation || 'Director of Procurement',
-              description: data.description || '',
-              areas: data.areas || ''
+              designation: extData.designation || 'Director of Procurement',
+              description: extData.description || '',
+              areas: extData.areas || ''
             };
             setExtendedBusinessData(extendedData);
             
@@ -174,7 +175,7 @@ export const useBusinessData = (userId?: string) => {
           };
           
           await supabase
-            .rpc<RPCVoidResponse>('update_business_extended_data', params);
+            .rpc('update_business_extended_data', params);
           
           const extendedData: ExtendedBusinessData = {
             designation: data.designation,
@@ -215,7 +216,7 @@ export const useBusinessData = (userId?: string) => {
             };
             
             await supabase
-              .rpc<RPCVoidResponse>('update_business_extended_data', params);
+              .rpc('update_business_extended_data', params);
             
             const extendedData: ExtendedBusinessData = {
               designation: data.designation,
