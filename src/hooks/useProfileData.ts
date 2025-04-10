@@ -41,7 +41,7 @@ export const useProfileData = (userId?: string) => {
       try {
         const { data, error: extendedError } = await supabase
           .rpc('get_trader_bio', { user_id: userId })
-          .returns<TraderBioResponse | null>();
+          .returns<TraderBioResponse>();
         
         if (!extendedError && data) {
           setProfileBio(data.bio_text || "");

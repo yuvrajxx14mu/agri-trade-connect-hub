@@ -47,7 +47,7 @@ export const useBusinessData = (userId?: string) => {
         try {
           const { data, error: extBusinessError } = await supabase
             .rpc('get_business_extended_data', { b_id: businessData.id })
-            .returns<BusinessExtendedDataResponse | null>();
+            .returns<BusinessExtendedDataResponse>();
             
           if (!extBusinessError && data) {
             const extendedData: ExtendedBusinessData = {
