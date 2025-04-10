@@ -47,10 +47,11 @@ export const useBusinessData = (userId?: string) => {
           const { data, error: extBusinessError } = await fetchExtendedBusinessData(businessData.id || '');
             
           if (!extBusinessError && data) {
+            const typedData = data as BusinessExtendedDataResponse;
             const extendedData: ExtendedBusinessData = {
-              designation: data.designation || 'Director of Procurement',
-              description: data.description || '',
-              areas: data.areas || ''
+              designation: typedData.designation || 'Director of Procurement',
+              description: typedData.description || '',
+              areas: typedData.areas || ''
             };
             setExtendedBusinessData(extendedData);
             setCompanyFormData(mapBusinessToCompanyForm(businessData, extendedData));
