@@ -183,68 +183,7 @@ export const useMessages = () => {
     conversations,
     currentMessages,
     fetchConversations,
-    fetchMessages: useCallback(async (userId: string) => {
-      if (!profile?.id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('messages')
-          .select('*')
-          .or(`and(sender_id.eq.${profile.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${profile.id})`)
-          .order('created_at', { ascending: true });
-  
-        if (error) throw error;
-  
-        // Mark received messages as read
-        const unreadMessageIds = data
-          ?.filter(msg => msg.receiver_id === profile.id && !msg.read)
-          .map(msg => msg.id) || [];
-  
-        if (unreadMessageIds.length > 0) {
-          await supabase
-            .from('messages')
-            .update({ read: true })
-            .in('id', unreadMessageIds);
-        }
-  
-        setCurrentMessages(data || []);
-      } catch (error) {
-        console.error('Error fetching messages:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load messages",
-          variant: "destructive"
-        });
-      }
-    }, [profile?.id, toast]),
-    sendMessage: useCallback(async (receiverId: string, content: string) => {
-      if (!profile?.id) return false;
-      
-      try {
-        const { error } = await supabase
-          .from('messages')
-          .insert({
-            sender_id: profile.id,
-            receiver_id: receiverId,
-            content: content,
-            read: false
-          });
-  
-        if (error) throw error;
-        
-        // Refresh messages
-        fetchMessages(receiverId);
-        
-        return true;
-      } catch (error) {
-        console.error('Error sending message:', error);
-        toast({
-          title: "Error",
-          description: "Failed to send message",
-          variant: "destructive"
-        });
-        return false;
-      }
-    }, [profile?.id, fetchMessages, toast])
+    fetchMessages,
+    sendMessage
   };
 };

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -89,12 +90,12 @@ const TraderAppointments = () => {
     try {
       setIsLoading(true);
       
-      // Fix the query by explicitly specifying the columns from profiles
+      // Modified query to properly join with the profiles table
       const { data, error } = await supabase
         .from('appointments')
         .select(`
           *,
-          profiles:farmer_id(id, name)
+          farmer:farmer_id(id, name)
         `)
         .eq('trader_id', profile.id)
         .order('appointment_date', { ascending: true });
@@ -104,7 +105,7 @@ const TraderAppointments = () => {
       // Format the appointments with farmer name
       const formattedAppointments = data.map(appointment => ({
         ...appointment,
-        farmer_name: appointment.profiles ? appointment.profiles.name : "Unknown Farmer"
+        farmer_name: appointment.farmer ? appointment.farmer.name : "Unknown Farmer"
       }));
       
       setAppointments(formattedAppointments || []);

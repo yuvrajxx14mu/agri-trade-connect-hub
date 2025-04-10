@@ -54,63 +54,6 @@ const TraderMessages = () => {
     };
   }, [profile?.id, selectedUser, fetchConversations, fetchMessages]);
 
-  // Modified function to handle the error with 'distinct'
-  const fetchUserConversations = async () => {
-    if (!profile?.id) return [];
-
-    try {
-      // Get unique sender IDs
-      const { data: sentToUsers, error: sentError } = await supabase
-        .from('messages')
-        .select('receiver_id')
-        .eq('sender_id', profile.id);
-
-      // Get unique receiver IDs
-      const { data: receivedFromUsers, error: receivedError } = await supabase
-        .from('messages')
-        .select('sender_id')
-        .eq('receiver_id', profile.id);
-
-      if (sentError || receivedError) {
-        throw sentError || receivedError;
-      }
-
-      // Combine unique user IDs manually
-      const uniqueUserIds = new Set([
-        ...(sentToUsers || []).map(msg => msg.receiver_id),
-        ...(receivedFromUsers || []).map(msg => msg.sender_id)
-      ]);
-
-      const userIds = Array.from(uniqueUserIds);
-      if (userIds.length === 0) {
-        return [];
-      }
-
-      // Fetch user details
-      const { data: userProfiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, name, role')
-        .in('id', userIds);
-
-      if (profilesError) {
-        throw profilesError;
-      }
-
-      return (userProfiles || []).map(user => ({
-        id: user.id,
-        user: {
-          id: user.id,
-          name: user.name,
-          role: user.role,
-          initials: user.name.split(' ').map((n: string) => n[0]).join('')
-        }
-      }));
-    } catch (error) {
-      console.error('Error fetching conversations:', error);
-      return [];
-    }
-  };
-
   const handleSelectUser = (user: any) => {
     setSelectedUser(user);
     fetchMessages(user.id);
@@ -123,6 +66,10 @@ const TraderMessages = () => {
     if (success) {
       setNewMessage('');
     }
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('');
   };
 
   return (
@@ -178,7 +125,7 @@ const TraderMessages = () => {
                         <Avatar>
                           <AvatarImage src="" />
                           <AvatarFallback>
-                            {convo.user.name ? convo.user.name.split(' ').map((n: string) => n[0]).join('') : 'U'}
+                            {getInitials(convo.user.name)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
@@ -218,7 +165,7 @@ const TraderMessages = () => {
                   <Avatar>
                     <AvatarImage src="" />
                     <AvatarFallback>
-                      {selectedUser.name ? selectedUser.name.split(' ').map((n: string) => n[0]).join('') : 'U'}
+                      {getInitials(selectedUser.name)}
                     </AvatarFallback>
                   </Avatar>
                   <div>
