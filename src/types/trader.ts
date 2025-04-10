@@ -68,7 +68,7 @@ export interface GetTraderBioParams {
 }
 
 export interface GetBusinessExtendedDataParams {
-  b_id: string;
+  b_id: string; 
 }
 
 export interface UpdateTraderBioParams {

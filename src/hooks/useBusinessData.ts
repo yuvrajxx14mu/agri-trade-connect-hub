@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -46,7 +47,7 @@ export const useBusinessData = (userId?: string) => {
         setBusinessDetails(businessData);
         
         try {
-          const params: GetBusinessExtendedDataParams = { b_id: businessData.id };
+          const params: GetBusinessExtendedDataParams = { b_id: businessData.id || '' };
           const { data, error: extBusinessError } = await supabase
             .rpc('get_business_extended_data', params)
             .returns<BusinessExtendedDataResponse>();
@@ -167,7 +168,7 @@ export const useBusinessData = (userId?: string) => {
         
         try {
           const params: UpdateBusinessExtendedDataParams = { 
-            business_id: businessDetails.id, 
+            business_id: businessDetails.id || '', 
             designation_text: data.designation,
             description_text: data.businessDescription,
             areas_text: data.operationalAreas
@@ -208,7 +209,7 @@ export const useBusinessData = (userId?: string) => {
           
           try {
             const params: UpdateBusinessExtendedDataParams = { 
-              business_id: newBusinessData.id, 
+              business_id: newBusinessData.id || '', 
               designation_text: data.designation,
               description_text: data.businessDescription,
               areas_text: data.operationalAreas
