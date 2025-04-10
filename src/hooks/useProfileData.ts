@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -48,10 +47,11 @@ export const useProfileData = (userId?: string) => {
       try {
         const params: GetTraderBioParams = { user_id: userId };
         const { data, error: extendedError } = await supabase
-          .rpc<TraderBioResponse, GetTraderBioParams>('get_trader_bio', params);
+          .rpc('get_trader_bio', params);
         
         if (!extendedError && data) {
-          setProfileBio(data.bio_text || "");
+          const bioResponse = data as TraderBioResponse;
+          setProfileBio(bioResponse.bio_text || "");
         }
       } catch (bioError) {
         console.error('Bio data not available:', bioError);
@@ -115,10 +115,12 @@ export const useProfileData = (userId?: string) => {
           bio_text: data.bio 
         };
         
-        await supabase
-          .rpc<RPCVoidResponse, UpdateTraderBioParams>('update_trader_bio', params);
+        const { error: bioError } = await supabase
+          .rpc('update_trader_bio', params);
         
-        setProfileBio(data.bio);
+        if (!bioError) {
+          setProfileBio(data.bio);
+        }
       } catch (bioError) {
         console.error('Error updating bio:', bioError);
       }

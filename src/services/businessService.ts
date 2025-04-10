@@ -19,8 +19,13 @@ export async function fetchBusinessDetails(userId: string) {
 
 export async function fetchExtendedBusinessData(businessId: string) {
   const params: GetBusinessExtendedDataParams = { b_id: businessId };
-  return await supabase
-    .rpc<BusinessExtendedDataResponse, GetBusinessExtendedDataParams>('get_business_extended_data', params);
+  const { data, error } = await supabase
+    .rpc('get_business_extended_data', params);
+    
+  return { 
+    data: data as BusinessExtendedDataResponse, 
+    error 
+  };
 }
 
 export async function updateBusinessDetails(businessId: string, businessData: Partial<BusinessDetails>) {
@@ -38,6 +43,11 @@ export async function createBusinessDetails(businessData: BusinessDetails) {
 }
 
 export async function updateExtendedBusinessData(params: UpdateBusinessExtendedDataParams) {
-  return await supabase
-    .rpc<RPCVoidResponse, UpdateBusinessExtendedDataParams>('update_business_extended_data', params);
+  const { data, error } = await supabase
+    .rpc('update_business_extended_data', params);
+    
+  return { 
+    data: data as RPCVoidResponse, 
+    error 
+  };
 }

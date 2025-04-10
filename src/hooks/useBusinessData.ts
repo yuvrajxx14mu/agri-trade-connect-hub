@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -113,18 +112,19 @@ export const useBusinessData = (userId?: string) => {
             areas_text: data.operationalAreas
           };
           
-          await updateExtendedBusinessData(params);
+          const { error: extError } = await updateExtendedBusinessData(params);
           
-          const extendedData = mapCompanyFormToExtendedData(data);
-          setExtendedBusinessData(extendedData);
-          setCompanyFormData(data);
+          if (!extError) {
+            const extendedData = mapCompanyFormToExtendedData(data);
+            setExtendedBusinessData(extendedData);
+            setCompanyFormData(data);
+          }
         } catch (extError) {
           console.error('Error updating extended business data:', extError);
         }
       } else {
         const businessData = mapCompanyFormToBusinessDetails(data, userId);
         
-        // Ensure required fields are present
         if (!businessData.business_name) {
           throw new Error("Business name is required");
         }
@@ -145,11 +145,13 @@ export const useBusinessData = (userId?: string) => {
               areas_text: data.operationalAreas
             };
             
-            await updateExtendedBusinessData(params);
+            const { error: extError } = await updateExtendedBusinessData(params);
             
-            const extendedData = mapCompanyFormToExtendedData(data);
-            setExtendedBusinessData(extendedData);
-            setCompanyFormData(data);
+            if (!extError) {
+              const extendedData = mapCompanyFormToExtendedData(data);
+              setExtendedBusinessData(extendedData);
+              setCompanyFormData(data);
+            }
           } catch (extError) {
             console.error('Extended business data function not available:', extError);
           }
