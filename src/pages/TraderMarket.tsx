@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -30,7 +29,6 @@ interface Product {
   farmer_name: string;
   created_at: string;
   image_url: string | null;
-  auction_id: string | null;
 }
 
 const TraderMarket = () => {
@@ -49,8 +47,9 @@ const TraderMarket = () => {
   
   const fetchProducts = async () => {
     try {
-      // Fetch active products with related data
-      const { data: marketProducts, error } = await supabase
+      console.log('Fetching products...');
+      
+      const { data: marketProducts, error: productsError } = await supabase
         .from('products')
         .select(`
           id,
@@ -65,12 +64,12 @@ const TraderMarket = () => {
           farmer_id,
           farmer_name,
           created_at,
-          image_url,
-          auction_id
+          image_url
         `)
         .eq('status', 'active');
 
-      if (error) throw error;
+      if (productsError) throw productsError;
+      console.log('Fetched products:', marketProducts?.length || 0);
 
       // Get unique categories and locations
       const uniqueCategories = [...new Set(marketProducts?.map(p => p.category) || [])];
@@ -105,14 +104,9 @@ const TraderMarket = () => {
     const channel = supabase
       .channel('market-changes')
       .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'products' }, 
+        { event: '*', schema: 'public', table: 'products' }, 
         () => {
-          fetchProducts();
-        }
-      )
-      .on('postgres_changes', 
-        { event: 'UPDATE', schema: 'public', table: 'products' }, 
-        () => {
+          console.log('Product change detected, refreshing...');
           fetchProducts();
         }
       )
@@ -133,15 +127,14 @@ const TraderMarket = () => {
       product.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.farmer_name.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesTab = activeTab === "all" || 
-                       (activeTab === "direct" && !product.auction_id) ||
-                       (activeTab === "auction" && product.auction_id);
-    
     const matchesCategory = categoryFilter === "All" || product.category === categoryFilter;
     const matchesLocation = locationFilter === "All" || product.location === locationFilter;
     
-    return matchesSearch && matchesTab && matchesCategory && matchesLocation;
+    return matchesSearch && matchesCategory && matchesLocation;
   });
+
+  console.log('Total products:', products.length);
+  console.log('Filtered products:', filteredProducts.length);
 
   if (loading) {
     return (
@@ -206,14 +199,6 @@ const TraderMarket = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="all">All Products</TabsTrigger>
-              <TabsTrigger value="direct">Direct Purchase</TabsTrigger>
-              <TabsTrigger value="auction">Auctions</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
           {filteredProducts.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredProducts.map((product) => (
@@ -225,7 +210,7 @@ const TraderMarket = () => {
                   quantity={`${product.quantity} ${product.unit}`}
                   price={formatCurrency(product.price)}
                   location={product.location}
-                  status={product.auction_id ? "In Auction" : "Listed"}
+                  status="Listed"
                   image={product.image_url || undefined}
                   userRole="trader"
                 />

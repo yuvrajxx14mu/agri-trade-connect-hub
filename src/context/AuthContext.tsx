@@ -69,38 +69,21 @@ const AuthProviderContent = ({
     console.log("Auth state changed:", event, "Session:", currentSession?.user?.email);
     
     try {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      if (currentSession?.user) {
-        console.log("Fetching profile for authenticated user");
+      if (event === 'SIGNED_OUT' || !currentSession) {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        return;
+      }
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setSession(currentSession);
+        setUser(currentSession.user);
+        
         const profileData = await fetchProfile(currentSession.user.id);
         if (profileData) {
-          console.log("Setting profile:", profileData);
           setProfile(profileData);
-        } else {
-          console.log("No profile data found, creating basic profile");
-          // If no profile is found but we have a session, create a basic profile
-          const basicProfile = {
-            id: currentSession.user.id,
-            name: currentSession.user.user_metadata?.name || "User",
-            role: currentSession.user.user_metadata?.role || "farmer",
-            email: currentSession.user.email,
-          };
-          setProfile(basicProfile as Profile);
-          
-          // Create the profile in the database
-          const { error } = await supabase
-            .from('profiles')
-            .insert([basicProfile]);
-            
-          if (error) {
-            console.error('Error creating profile:', error);
-          }
         }
-      } else {
-        console.log("No session, clearing profile");
-        setProfile(null);
       }
     } catch (error) {
       console.error("Error in handleAuthStateChange:", error);
@@ -125,8 +108,32 @@ const AuthProviderContent = ({
         }
 
         if (mounted) {
-          console.log("Initial session:", initialSession?.user?.email);
-          await handleAuthStateChange('INITIAL_SESSION', initialSession);
+          if (initialSession?.user) {
+            console.log("Initial session found:", initialSession.user.email);
+            const profileData = await fetchProfile(initialSession.user.id);
+            
+            setSession(initialSession);
+            setUser(initialSession.user);
+            
+            if (profileData) {
+              setProfile(profileData);
+            } else {
+              const basicProfile = {
+                id: initialSession.user.id,
+                name: initialSession.user.user_metadata?.name || "User",
+                role: initialSession.user.user_metadata?.role || "trader",
+                email: initialSession.user.email,
+              };
+              
+              const { error: profileError } = await supabase
+                .from('profiles')
+                .insert([basicProfile]);
+                
+              if (!profileError) {
+                setProfile(basicProfile as Profile);
+              }
+            }
+          }
           setInitialized(true);
           setLoading(false);
         }
@@ -145,10 +152,8 @@ const AuthProviderContent = ({
     // Set up auth state listener after initialization
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       console.log("Auth state change event:", event);
-      if (mounted && initialized) { // Only handle auth changes after initialization
-        setLoading(true);
+      if (mounted && initialized) {
         await handleAuthStateChange(event, currentSession);
-        setLoading(false);
       }
     });
 

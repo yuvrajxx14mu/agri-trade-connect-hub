@@ -13,12 +13,14 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 const COLORS = ['#2D6A4F', '#40916C', '#52B788', '#74C69D', '#95D5B2'];
 
 const TraderDashboard = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
     activeAuctions: [],
@@ -29,111 +31,204 @@ const TraderDashboard = () => {
     recentOrders: []
   });
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (!profile?.id) return;
+  const fetchDashboardData = async () => {
+    if (!profile?.id) return;
 
-      try {
-        // Fetch active auctions with proper joins and filters
-        const { data: auctions, error: auctionsError } = await supabase
-          .from('auctions')
-          .select(`
-            id,
-            current_price,
-            end_time,
-            product_id,
-            products!auctions_product_id_fkey (
-              id,
-              name,
-              quantity,
-              unit,
-              farmer_name,
-              location,
-              category
-            )
-          `)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(4);
+    try {
+      // Fetch active auctions with proper joins and filters
+      const { data: auctions, error: auctionsError } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('status', 'active');
 
-        if (auctionsError) {
-          console.error('Error fetching auctions:', auctionsError);
-          throw auctionsError;
+      if (auctionsError) {
+        console.error('Error fetching auctions:', {
+          message: auctionsError.message,
+          details: auctionsError.details,
+          hint: auctionsError.hint,
+          code: auctionsError.code
+        });
+        throw auctionsError;
+      }
+
+      console.log('Raw auctions data:', auctions); // Debug log
+
+      // If we get auctions, then try to fetch their product details
+      let processedAuctions = [];
+      if (auctions && auctions.length > 0) {
+        const productIds = auctions.map(auction => auction.product_id);
+        
+        const { data: products, error: productsError } = await supabase
+          .from('products')
+          .select('*')
+          .in('id', productIds);
+
+        if (productsError) {
+          console.error('Error fetching products for auctions:', {
+            message: productsError.message,
+            details: productsError.details,
+            hint: productsError.hint,
+            code: productsError.code
+          });
+          throw productsError;
         }
 
-        // Process auctions data with proper null checks
-        const processedAuctions = (auctions || [])
-          .filter(auction => auction.products) // Ensure product data exists
-          .map(auction => ({
-            id: auction.id,
-            name: auction.products.name,
-            quantity: auction.products.quantity,
-            unit: auction.products.unit,
-            price: auction.current_price,
-            location: auction.products.location,
-            category: auction.products.category,
-            end_time: auction.end_time,
-            profiles: {
-              name: auction.products.farmer_name
-            }
-          }));
+        console.log('Products for auctions:', products); // Debug log
 
-        // Fetch orders statistics
-        const { data: orders } = await supabase
-          .from('orders')
-          .select('*')
-          .eq('trader_id', profile.id);
-
-        // Calculate product categories distribution
-        const { data: products } = await supabase
-          .from('products')
-          .select('category')
-          .eq('status', 'active');
-
-        // Process product categories
-        const categoryCounts = products?.reduce((acc, product) => {
-          acc[product.category] = (acc[product.category] || 0) + 1;
+        // Create a map of products for easy lookup
+        const productsMap = (products || []).reduce((acc, product) => {
+          acc[product.id] = product;
           return acc;
         }, {});
 
-        const totalProducts = products?.length || 0;
-        const productCategories = Object.entries(categoryCounts || {}).map(([name, count]) => ({
-          name,
-          value: Math.round((count as number / totalProducts) * 100)
-        }));
-
-        // Calculate order statistics
-        const totalOrders = orders?.length || 0;
-        const totalRevenue = orders?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
-        const pendingOrders = orders?.filter(order => order.status === 'pending').length || 0;
-
-        // Get recent orders
-        const recentOrders = orders?.slice(0, 3) || [];
-
-        setDashboardData({
-          activeAuctions: processedAuctions,
-          productCategories,
-          totalOrders,
-          totalRevenue,
-          pendingOrders,
-          recentOrders
+        // Process auctions with product data
+        processedAuctions = auctions.map(auction => {
+          const product = productsMap[auction.product_id];
+          return {
+            id: auction.id,
+            name: product?.name || 'Unknown Product',
+            quantity: auction.quantity || 0,
+            unit: product?.unit || 'units',
+            price: auction.current_price,
+            location: product?.location || 'Unknown',
+            category: product?.category || 'Uncategorized',
+            end_time: auction.end_time,
+            profiles: {
+              name: `Farmer ${auction.farmer_id.slice(0, 8)}`
+            }
+          };
         });
-
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        setIsLoading(false);
       }
-    };
 
+      console.log('Processed auctions:', processedAuctions); // Debug log
+
+      // Fetch orders statistics
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('*, products (*)')
+        .eq('trader_id', profile.id);
+
+      if (ordersError) {
+        console.error('Error fetching orders:', {
+          message: ordersError.message,
+          details: ordersError.details,
+          hint: ordersError.hint,
+          code: ordersError.code
+        });
+        throw ordersError;
+      }
+
+      console.log('Fetched orders:', orders); // Debug log
+
+      // Calculate product categories distribution
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('category')
+        .eq('status', 'active');
+
+      if (productsError) {
+        console.error('Error fetching products:', {
+          message: productsError.message,
+          details: productsError.details,
+          hint: productsError.hint,
+          code: productsError.code
+        });
+        throw productsError;
+      }
+
+      console.log('Fetched products:', products); // Debug log
+
+      // Process product categories
+      const categoryCounts = products?.reduce((acc, product) => {
+        acc[product.category] = (acc[product.category] || 0) + 1;
+        return acc;
+      }, {});
+
+      const totalProducts = products?.length || 0;
+      const productCategories = Object.entries(categoryCounts || {}).map(([name, count]) => ({
+        name,
+        value: Math.round((count as number / totalProducts) * 100)
+      }));
+
+      // Calculate order statistics
+      const totalOrders = orders?.length || 0;
+      const totalRevenue = orders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+      const pendingOrders = orders?.filter(order => order.status === 'pending').length || 0;
+
+      // Get recent orders
+      const recentOrders = orders?.slice(0, 3) || [];
+
+      setDashboardData({
+        activeAuctions: processedAuctions,
+        productCategories,
+        totalOrders,
+        totalRevenue,
+        pendingOrders,
+        recentOrders
+      });
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch dashboard data. Please try again later.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchDashboardData();
+
+    // Set up real-time subscriptions
+    const ordersSubscription = supabase
+      .channel('orders-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `trader_id=eq.${profile?.id}`
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    const auctionsSubscription = supabase
+      .channel('auctions-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'auctions',
+          filter: 'status=eq.active'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions
+    return () => {
+      ordersSubscription.unsubscribe();
+      auctionsSubscription.unsubscribe();
+    };
   }, [profile?.id]);
 
   if (isLoading) {
     return (
       <DashboardLayout userRole="trader">
         <DashboardHeader title="Trader Dashboard" userName={profile?.name || ""} userRole="trader" />
-        <div>Loading...</div>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
       </DashboardLayout>
     );
   }

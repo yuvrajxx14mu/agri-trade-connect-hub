@@ -15,6 +15,39 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
+interface DatabaseAuction {
+  id: string;
+  product_id: string;
+  farmer_id: string;
+  start_price: number;
+  current_price: number;
+  min_increment: number;
+  end_time: string;
+  status: string;
+  created_at: string;
+  products: {
+    id: string;
+    name: string;
+    category: string;
+    quantity: number;
+    unit: string;
+    location: string;
+    farmer_id: string;
+    image_url?: string;
+    profiles: {
+      id: string;
+      name: string;
+      role: string;
+    };
+  } | null;
+  bids: Array<{
+    id: string;
+    amount: number;
+    bidder_id: string;
+    created_at: string;
+  }> | null;
+}
+
 interface AuctionProduct {
   id: string;
   name: string;
@@ -47,132 +80,118 @@ const TraderAuctions = () => {
   const [auctions, setAuctions] = useState<AuctionProduct[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
-  const [refreshInterval, setRefreshInterval] = useState<number | null>(null);
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
   const [selectedAuction, setSelectedAuction] = useState<AuctionProduct | null>(null);
   const [bidAmount, setBidAmount] = useState("");
   const [isBidding, setIsBidding] = useState(false);
 
   const fetchAuctions = async () => {
     try {
-      setIsLoading(true);
-      console.log("Fetching auctions...");
-      
-      // First get all active products with their auctions
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
+      console.log('Fetching auctions...');
+      const { data: auctionsData, error: auctionsError } = await supabase
+        .from('auctions')
         .select(`
-          id,
-          name,
-          category,
-          quantity,
-          unit,
-          price,
-          location,
-          farmer_id,
-          farmer_name,
-          created_at,
-          image_url,
-          auction_id,
-          auctions!inner (
-            id,
-            current_price,
-            min_increment,
-            end_time,
-            status
+          *,
+          products!auctions_product_id_fkey (
+            *
           )
         `)
-        .eq('auctions.status', 'active')
+        .eq('status', 'active')
         .order('created_at', { ascending: false });
 
-      if (productsError) {
-        console.error('Error fetching auctions:', productsError);
-        throw productsError;
-      }
-
-      if (!productsData || productsData.length === 0) {
-        console.log("No auctions found in the database");
-        setAuctions([]);
-        setIsLoading(false);
+      if (auctionsError) {
+        console.error('Error fetching auctions:', auctionsError);
         return;
       }
 
-      // Transform the data
-      const auctionProducts: AuctionProduct[] = productsData.map(product => ({
-        id: product.id,
-        name: product.name,
-        category: product.category,
-        quantity: product.quantity,
-        unit: product.unit,
-        price: product.price,
-        location: product.location,
-        farmer_id: product.farmer_id,
-        farmer_name: product.farmer_name,
-        created_at: product.created_at,
-        image_url: product.image_url || undefined,
-        auction: {
-          id: product.auctions.id,
-          current_price: product.auctions.current_price,
-          min_increment: product.auctions.min_increment,
-          end_time: product.auctions.end_time,
-          status: product.auctions.status
-        }
-      }));
+      console.log('Fetched auctions:', auctionsData?.length || 0, 'results');
+      if (auctionsData) {
+        // Transform the data
+        const transformedAuctions = auctionsData.map(auction => ({
+          id: auction.id,
+          name: auction.products?.name || 'Unknown Product',
+          category: auction.products?.category || 'Uncategorized',
+          quantity: auction.quantity || 0,
+          unit: auction.products?.unit || '',
+          price: auction.current_price || auction.start_price,
+          location: auction.products?.location || '',
+          farmer_name: auction.products?.farmer_name || 'Unknown Farmer',
+          farmer_id: auction.farmer_id || '',
+          created_at: auction.created_at,
+          image_url: auction.products?.image_url,
+          auction: {
+            id: auction.id,
+            current_price: auction.current_price,
+            min_increment: auction.min_increment,
+            end_time: auction.end_time,
+            status: auction.status
+          }
+        }));
 
-      // Get unique categories and locations
-      const uniqueCategories = [...new Set(auctionProducts.map(p => p.category))];
-      const uniqueLocations = [...new Set(auctionProducts.map(p => p.location))];
-
-      setCategories(uniqueCategories);
-      setLocations(uniqueLocations);
-      setAuctions(auctionProducts);
+        // Extract unique categories and locations for filters, filter out empty values
+        const uniqueCategories = [...new Set(transformedAuctions
+          .map(a => a.category)
+          .filter(category => category && category.trim() !== '')
+        )];
+        const uniqueLocations = [...new Set(transformedAuctions
+          .map(a => a.location)
+          .filter(location => location && location.trim() !== '')
+        )];
+        
+        setCategories(uniqueCategories);
+        setLocations(uniqueLocations);
+        setAuctions(transformedAuctions);
+        setIsLoading(false);
+      }
     } catch (error) {
-      console.error('Error fetching auctions:', error);
+      console.error('Exception while fetching auctions:', error);
       toast({
         title: "Error",
-        description: "Failed to load auctions. Please try again.",
+        description: "Failed to fetch auctions. Please try again later.",
         variant: "destructive"
       });
-    } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    console.log('Setting up auction subscriptions and initial fetch...');
+    
+    // Initial fetch
     fetchAuctions();
-    
-    // Set up a refresh interval
-    const interval = window.setInterval(() => {
-      fetchAuctions();
-    }, 30000); // Refresh every 30 seconds
-    
-    setRefreshInterval(interval);
-    
-    // Set up real-time subscription for auctions and bids
+
+    // Set up real-time subscriptions
     const channel = supabase
-      .channel('auction-updates')
-      .on('postgres_changes', 
-        { event: 'UPDATE', schema: 'public', table: 'auctions' }, 
-        () => {
-          console.log("Auction update detected");
-          fetchAuctions();
-        }
-      )
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'bids' }, 
-        () => {
-          console.log("New bid detected");
-          fetchAuctions();
-        }
-      )
-      .subscribe();
-    
+      .channel('auctions-channel')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'auctions',
+      }, () => {
+        console.log('Auction changes detected, refreshing...');
+        fetchAuctions();
+      })
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
+
+    // Set up polling interval as backup
+    const interval = setInterval(() => {
+      console.log('Polling interval triggered');
+      fetchAuctions();
+    }, 30000);
+
+    setRefreshInterval(interval);
+
+    // Cleanup function
     return () => {
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
+      console.log('Cleaning up subscriptions...');
+      channel.unsubscribe();
+      if (interval) {
+        clearInterval(interval);
       }
-      supabase.removeChannel(channel);
     };
-  }, []);
+  }, []); // Empty dependency array to run only once
 
   const filteredAuctions = auctions.filter(auction => {
     const matchesSearch = 
@@ -311,8 +330,8 @@ const TraderAuctions = () => {
                   <SelectContent>
                     <SelectItem value="All">All Categories</SelectItem>
                     {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
+                      <SelectItem key={category} value={category || "uncategorized"}>
+                        {category || "Uncategorized"}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -324,8 +343,8 @@ const TraderAuctions = () => {
                   <SelectContent>
                     <SelectItem value="All">All Locations</SelectItem>
                     {locations.map((location) => (
-                      <SelectItem key={location} value={location}>
-                        {location}
+                      <SelectItem key={location} value={location || "unknown"}>
+                        {location || "Unknown Location"}
                       </SelectItem>
                     ))}
                   </SelectContent>
