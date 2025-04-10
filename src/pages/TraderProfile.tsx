@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -162,8 +161,8 @@ const TraderProfile = () => {
       
       // Populate personal form data
       const nameParts = profileData.name?.split(' ') || ['', ''];
-      setPersonalValue('firstName', nameParts[0]);
-      setPersonalValue('lastName', nameParts.slice(1).join(' '));
+      setPersonalValue('firstName', nameParts[0] || '');
+      setPersonalValue('lastName', nameParts.slice(1).join(' ') || '');
       setPersonalValue('phone', profileData.phone || '');
       setPersonalValue('address', profileData.address || '');
       setPersonalValue('bio', profileBio || '');
