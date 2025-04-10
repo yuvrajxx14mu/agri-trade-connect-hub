@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -59,11 +60,14 @@ interface BusinessDetails {
   business_address: string;
   gst_number?: string;
   registration_number?: string;
-  designation?: string;
-  business_description?: string;
-  operational_areas?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+interface ExtendedBusinessData {
+  designation?: string;
+  description?: string;
+  areas?: string;
 }
 
 const TraderProfile = () => {
@@ -76,6 +80,7 @@ const TraderProfile = () => {
   const [savingCompany, setSavingCompany] = useState(false);
   const [extendedProfile, setExtendedProfile] = useState<ExtendedProfileData | null>(null);
   const [businessDetails, setBusinessDetails] = useState<BusinessDetails | null>(null);
+  const [extendedBusinessData, setExtendedBusinessData] = useState<ExtendedBusinessData | null>(null);
   const [profileEmail, setProfileEmail] = useState("");
   const [profileBio, setProfileBio] = useState("");
   
@@ -136,6 +141,7 @@ const TraderProfile = () => {
       setPersonalValue('lastName', nameParts.slice(1).join(' '));
       setPersonalValue('phone', profileData.phone || '');
       setPersonalValue('address', profileData.address || '');
+      setPersonalValue('bio', profileBio || '');
       
       // Fetch user email from auth.users
       const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -147,9 +153,6 @@ const TraderProfile = () => {
         setPersonalValue('email', userData.user.email);
       }
       
-      // Set bio in form
-      setPersonalValue('bio', profileBio); 
-      
       // Fetch business details
       const { data: businessData, error: businessError } = await supabase
         .from('business_details')
@@ -158,71 +161,77 @@ const TraderProfile = () => {
         .single();
       
       if (!businessError && businessData) {
+        setBusinessDetails(businessData);
+        
         // Get additional business fields if available
         try {
-          const { data: extendedBusinessData, error: extBusinessError } = await supabase
+          const { data: extBizData, error: extBusinessError } = await supabase
             .rpc('get_business_extended_data', { b_id: businessData.id });
             
-          if (!extBusinessError && extendedBusinessData) {
-            // Add extended fields to business data
-            const enhancedBusinessData: BusinessDetails = {
-              ...businessData,
-              designation: extendedBusinessData.designation || 'Director of Procurement',
-              business_description: extendedBusinessData.description || '',
-              operational_areas: extendedBusinessData.areas || ''
-            };
-            
-            setBusinessDetails(enhancedBusinessData);
-            
-            // Populate business form
-            setCompanyValue('companyName', enhancedBusinessData.business_name || '');
-            setCompanyValue('designation', enhancedBusinessData.designation || '');
-            setCompanyValue('gstin', enhancedBusinessData.gst_number || '');
-            setCompanyValue('tradeLicense', enhancedBusinessData.registration_number || '');
-            setCompanyValue('companyAddress', enhancedBusinessData.business_address || '');
-            setCompanyValue('businessDescription', enhancedBusinessData.business_description || '');
-            setCompanyValue('operationalAreas', enhancedBusinessData.operational_areas || '');
-          } else {
-            // Use default values if extended data not available
-            setBusinessDetails({
-              ...businessData,
-              designation: 'Director of Procurement',
-              business_description: '',
-              operational_areas: ''
+          if (!extBusinessError && extBizData) {
+            // Store extended fields
+            setExtendedBusinessData({
+              designation: extBizData.designation || 'Director of Procurement',
+              description: extBizData.description || '',
+              areas: extBizData.areas || ''
             });
             
+            // Populate business form with both standard and extended data
             setCompanyValue('companyName', businessData.business_name || '');
-            setCompanyValue('designation', 'Director of Procurement');
+            setCompanyValue('designation', extBizData.designation || 'Director of Procurement');
             setCompanyValue('gstin', businessData.gst_number || '');
             setCompanyValue('tradeLicense', businessData.registration_number || '');
             setCompanyValue('companyAddress', businessData.business_address || '');
-            setCompanyValue('businessDescription', '');
-            setCompanyValue('operationalAreas', '');
+            setCompanyValue('businessDescription', extBizData.description || '');
+            setCompanyValue('operationalAreas', extBizData.areas || '');
+          } else {
+            // Use default values if extended data not available
+            const defaultExtendedData = {
+              designation: 'Director of Procurement',
+              description: '',
+              areas: ''
+            };
+            setExtendedBusinessData(defaultExtendedData);
+            
+            setCompanyValue('companyName', businessData.business_name || '');
+            setCompanyValue('designation', defaultExtendedData.designation);
+            setCompanyValue('gstin', businessData.gst_number || '');
+            setCompanyValue('tradeLicense', businessData.registration_number || '');
+            setCompanyValue('companyAddress', businessData.business_address || '');
+            setCompanyValue('businessDescription', defaultExtendedData.description);
+            setCompanyValue('operationalAreas', defaultExtendedData.areas);
           }
         } catch (extError) {
           console.error('Error fetching extended business data:', extError);
           
           // Default values if extended business data fails
-          setBusinessDetails({
-            ...businessData,
+          const fallbackExtendedData = {
             designation: 'Director of Procurement',
-            business_description: '',
-            operational_areas: ''
-          });
+            description: '',
+            areas: ''
+          };
+          setExtendedBusinessData(fallbackExtendedData);
           
           setCompanyValue('companyName', businessData.business_name || '');
-          setCompanyValue('designation', 'Director of Procurement');
+          setCompanyValue('designation', fallbackExtendedData.designation);
           setCompanyValue('gstin', businessData.gst_number || '');
           setCompanyValue('tradeLicense', businessData.registration_number || '');
           setCompanyValue('companyAddress', businessData.business_address || '');
-          setCompanyValue('businessDescription', '');
-          setCompanyValue('operationalAreas', '');
+          setCompanyValue('businessDescription', fallbackExtendedData.description);
+          setCompanyValue('operationalAreas', fallbackExtendedData.areas);
         }
       } else {
         // Set defaults for new business
         setBusinessDetails(null);
+        const defaultNewBusinessData = {
+          designation: 'Director of Procurement',
+          description: '',
+          areas: ''
+        };
+        setExtendedBusinessData(defaultNewBusinessData);
+        
         setCompanyValue('companyName', '');
-        setCompanyValue('designation', 'Director of Procurement');
+        setCompanyValue('designation', defaultNewBusinessData.designation);
         setCompanyValue('gstin', '');
         setCompanyValue('tradeLicense', '');
         setCompanyValue('companyAddress', '');
@@ -309,9 +318,6 @@ const TraderProfile = () => {
         business_address: data.companyAddress,
         gst_number: data.gstin,
         registration_number: data.tradeLicense,
-        designation: data.designation,
-        business_description: data.businessDescription,
-        operational_areas: data.operationalAreas,
         updated_at: new Date().toISOString()
       };
       
@@ -339,6 +345,13 @@ const TraderProfile = () => {
             description_text: data.businessDescription,
             areas_text: data.operationalAreas
           });
+          
+          // Update local state
+          setExtendedBusinessData({
+            designation: data.designation,
+            description: data.businessDescription,
+            areas: data.operationalAreas
+          });
         } catch (extError) {
           console.error('Error updating extended business data:', extError);
           // Create a function to handle extended data if it doesn't exist
@@ -360,6 +373,9 @@ const TraderProfile = () => {
         if (error) throw error;
         
         if (newBusiness && newBusiness.length > 0) {
+          // Set the new business details locally
+          setBusinessDetails(newBusiness[0]);
+          
           // Update extended data if function exists
           try {
             await supabase.rpc('update_business_extended_data', { 
@@ -368,17 +384,17 @@ const TraderProfile = () => {
               description_text: data.businessDescription,
               areas_text: data.operationalAreas
             });
+            
+            // Update local state
+            setExtendedBusinessData({
+              designation: data.designation,
+              description: data.businessDescription,
+              areas: data.operationalAreas
+            });
           } catch (extError) {
             console.error('Extended business data function not available:', extError);
             // Create a function to handle extended data if it doesn't exist
           }
-          
-          setBusinessDetails({
-            ...newBusiness[0],
-            designation: data.designation,
-            business_description: data.businessDescription,
-            operational_areas: data.operationalAreas
-          });
         }
       }
       
