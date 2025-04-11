@@ -132,7 +132,7 @@ const TraderDashboard = () => {
       const { data: currentOrders, error: ordersError } = await supabase
         .from('orders')
         .select('*, products (*)')
-        .eq('trader_id', profile.id)
+        .eq('farmer_id', profile.id)
         .gte('created_at', currentPeriodStart.toISOString())
         .lte('created_at', now.toISOString());
 
@@ -150,7 +150,7 @@ const TraderDashboard = () => {
       const { data: previousOrders } = await supabase
         .from('orders')
         .select('*, products (*)')
-        .eq('trader_id', profile.id)
+        .eq('farmer_id', profile.id)
         .gte('created_at', previousPeriodStart.toISOString())
         .lt('created_at', currentPeriodStart.toISOString());
 

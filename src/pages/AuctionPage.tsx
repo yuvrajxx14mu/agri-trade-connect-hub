@@ -35,8 +35,14 @@ interface Bid {
   bidder_id: string;
   bidder_name: string;
   amount: number;
-  status: 'pending' | 'accepted' | 'rejected';
+  quantity: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'outbid';
+  is_highest_bid: boolean;
+  previous_bid_amount: number | null;
+  expires_at: string;
+  auction_end_time: string;
   created_at: string;
+  message?: string;
 }
 
 interface Product {
@@ -253,10 +259,10 @@ const AuctionPage = () => {
   };
 
   const handleBid = async () => {
-    if (!auction || !profile?.id || isBidding) return;
+    if (!auction || !profile || !bidAmount) return;
 
     const bidValue = parseFloat(bidAmount);
-    if (isNaN(bidValue)) {
+    if (isNaN(bidValue) || bidValue <= 0) {
       toast({
         title: "Invalid Bid",
         description: "Please enter a valid bid amount.",
@@ -265,27 +271,49 @@ const AuctionPage = () => {
       return;
     }
 
+    // Check if bid is higher than current price
     if (bidValue <= auction.current_price) {
       toast({
         title: "Invalid Bid",
-        description: "Bid must be higher than the current price.",
+        description: "Bid amount must be higher than current price.",
         variant: "destructive"
       });
       return;
     }
 
-    if (bidValue < auction.current_price + auction.min_increment) {
+    // Check if auction has ended
+    if (new Date() > new Date(auction.end_time)) {
       toast({
-        title: "Invalid Bid",
-        description: `Minimum bid increment is ${formatCurrency(auction.min_increment)}.`,
+        title: "Auction Ended",
+        description: "This auction has already ended.",
         variant: "destructive"
       });
       return;
     }
 
     setIsBidding(true);
+
     try {
-      // Insert the bid
+      // Get current highest bid
+      const { data: highestBid } = await supabase
+        .from('bids')
+        .select('*')
+        .eq('product_id', auction.product_id)
+        .eq('is_highest_bid', true)
+        .single();
+
+      // Update previous highest bid to outbid status if exists
+      if (highestBid) {
+        await supabase
+          .from('bids')
+          .update({ 
+            status: 'outbid',
+            is_highest_bid: false 
+          })
+          .eq('id', highestBid.id);
+      }
+
+      // Insert the new bid
       const { error: bidError } = await supabase
         .from('bids')
         .insert({
@@ -293,7 +321,12 @@ const AuctionPage = () => {
           bidder_id: profile.id,
           bidder_name: profile.name || '',
           amount: bidValue,
-          status: 'pending'
+          quantity: auction.quantity,
+          status: 'pending',
+          is_highest_bid: true,
+          previous_bid_amount: highestBid?.amount || null,
+          expires_at: auction.end_time,
+          auction_end_time: auction.end_time
         });
 
       if (bidError) throw bidError;
@@ -313,8 +346,28 @@ const AuctionPage = () => {
           user_id: auction.farmer_id,
           title: "New Bid Received",
           message: `A new bid of ${formatCurrency(bidValue)} has been placed on your auction`,
-          type: "bid"
+          type: "bid",
+          metadata: {
+            auction_id: auction.id,
+            bid_amount: bidValue
+          }
         });
+
+      // Create notification for outbid trader if exists
+      if (highestBid && highestBid.bidder_id !== profile.id) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: highestBid.bidder_id,
+            title: "You've Been Outbid",
+            message: `Your bid of ${formatCurrency(highestBid.amount)} has been outbid by ${formatCurrency(bidValue)}`,
+            type: "bid",
+            metadata: {
+              auction_id: auction.id,
+              bid_amount: bidValue
+            }
+          });
+      }
 
       toast({
         title: "Bid Placed",

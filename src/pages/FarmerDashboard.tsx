@@ -51,7 +51,8 @@ const FarmerDashboard = () => {
           .from('orders')
           .select('*')
           .eq('farmer_id', profile.id)
-          .eq('status', 'completed');
+          .eq('status', 'completed')
+          .eq('payment_status', 'completed');
 
         // Fetch pending orders
         const { data: pendingOrders } = await supabase

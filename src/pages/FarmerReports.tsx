@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -502,6 +501,7 @@ const FarmerReports = () => {
       .select('total_amount, created_at')
       .eq('farmer_id', profile.id)
       .eq('status', 'completed')
+      .eq('payment_status', 'completed')
       .gte('created_at', `${yearFilter}-01-01`)
       .lte('created_at', `${yearFilter}-12-31`);
     

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -15,6 +14,33 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
+interface Bid {
+  id: string;
+  product_id: string;
+  bidder_id: string;
+  bidder_name: string;
+  amount: number;
+  quantity: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'outbid';
+  is_highest_bid: boolean;
+  previous_bid_amount: number | null;
+  expires_at: string;
+  auction_end_time: string;
+  created_at: string;
+  message?: string;
+  products: {
+    id: string;
+    name: string;
+    quantity: number;
+    unit: string;
+    farmer_id: string;
+    profiles: {
+      id: string;
+      name: string;
+    };
+  };
+}
+
 const TraderBids = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -22,7 +48,7 @@ const TraderBids = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [bids, setBids] = useState<any[]>([]);
+  const [bids, setBids] = useState<Bid[]>([]);
 
   useEffect(() => {
     fetchBids();
@@ -31,11 +57,7 @@ const TraderBids = () => {
     const channel = supabase
       .channel('bids-changes')
       .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'bids', filter: `bidder_id=eq.${profile?.id}` }, 
-        () => { fetchBids(); }
-      )
-      .on('postgres_changes', 
-        { event: 'UPDATE', schema: 'public', table: 'bids', filter: `bidder_id=eq.${profile?.id}` }, 
+        { event: '*', schema: 'public', table: 'bids', filter: `bidder_id=eq.${profile?.id}` }, 
         () => { fetchBids(); }
       )
       .subscribe();
@@ -53,11 +75,7 @@ const TraderBids = () => {
       const { data, error } = await supabase
         .from('bids')
         .select(`
-          id,
-          amount,
-          created_at,
-          status,
-          product_id,
+          *,
           products (
             id,
             name,
@@ -88,33 +106,27 @@ const TraderBids = () => {
     }
   };
 
-  const filteredBids = bids.filter(bid => {
-    const matchesSearch = 
-      (bid.id && bid.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (bid.products?.name && bid.products.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (bid.products?.profiles?.name && bid.products.profiles.name.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchesStatus = 
-      filterStatus === "all" ||
-      (filterStatus === "active" && bid.status === "active") ||
-      (filterStatus === "won" && bid.status === "won") ||
-      (filterStatus === "lost" && bid.status === "lost");
-
-    return matchesSearch && matchesStatus;
-  });
-
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "active":
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Active</Badge>;
-      case "won":
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Won</Badge>;
-      case "lost":
-        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Lost</Badge>;
+      case 'pending':
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+      case 'accepted':
+        return <Badge variant="outline" className="bg-green-100 text-green-800">Accepted</Badge>;
+      case 'rejected':
+        return <Badge variant="outline" className="bg-red-100 text-red-800">Rejected</Badge>;
+      case 'outbid':
+        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Outbid</Badge>;
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  const filteredBids = bids.filter(bid => {
+    const matchesSearch = bid.products?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         bid.products?.profiles?.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || bid.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <DashboardLayout userRole="trader">
@@ -167,6 +179,7 @@ const TraderBids = () => {
                   <TableHead>Bid Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Bid Time</TableHead>
+                  <TableHead>Expires</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -180,15 +193,28 @@ const TraderBids = () => {
                       </div>
                     </TableCell>
                     <TableCell>{bid.products?.profiles?.name || "Unknown Farmer"}</TableCell>
-                    <TableCell>{`${bid.products?.quantity || 0} ${bid.products?.unit || ""}`}</TableCell>
+                    <TableCell>{`${bid.quantity} ${bid.products?.unit || ""}`}</TableCell>
                     <TableCell className="font-medium">
-                      {formatCurrency(bid.amount)}/{bid.products?.unit || "unit"}
+                      <div>
+                        {formatCurrency(bid.amount)}/{bid.products?.unit || "unit"}
+                      </div>
+                      {bid.previous_bid_amount && (
+                        <div className="text-sm text-gray-500">
+                          Previous: {formatCurrency(bid.previous_bid_amount)}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>{getStatusBadge(bid.status)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-muted-foreground" />
                         <span>{new Date(bid.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span>{new Date(bid.expires_at).toLocaleDateString()}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">

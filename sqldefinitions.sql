@@ -89,6 +89,9 @@ create table public.bids (
   )
 ) TABLESPACE pg_default;
 
+create index IF not exists idx_bids_product_status on public.bids using btree (product_id, status) TABLESPACE pg_default;
+create index IF not exists idx_bids_bidder on public.bids using btree (bidder_id) TABLESPACE pg_default;
+
 create trigger update_bids_timestamp BEFORE
 update on bids for EACH row
 execute FUNCTION update_updated_at_column ();

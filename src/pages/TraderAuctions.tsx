@@ -167,8 +167,12 @@ const TraderAuctions = () => {
       })) || [];
 
       // Get unique categories and locations
-      const uniqueCategories = [...new Set(transformedAuctions.map(a => a.category))];
-      const uniqueLocations = [...new Set(transformedAuctions.map(a => a.location))];
+      const uniqueCategories = [...new Set(transformedAuctions
+        .map(a => a.category)
+        .filter(category => category && category.trim() !== ''))];
+      const uniqueLocations = [...new Set(transformedAuctions
+        .map(a => a.location)
+        .filter(location => location && location.trim() !== ''))];
 
       setCategories(uniqueCategories);
       setLocations(uniqueLocations);
@@ -345,7 +349,7 @@ const TraderAuctions = () => {
           ) : filteredAuctions.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAuctions.map((auction) => (
-                <Card key={auction.id} className="flex flex-col">
+                <Card key={`${auction.id}-${auction.auction.id}`} className="flex flex-col">
                   <CardContent className="flex-1">
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
