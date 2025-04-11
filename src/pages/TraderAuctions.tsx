@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import BidDialog from "@/components/BidDialog";
 
 interface DatabaseAuction {
   id: string;
@@ -22,6 +23,7 @@ interface DatabaseAuction {
   start_price: number;
   current_price: number;
   min_increment: number;
+  quantity: number;
   end_time: string;
   status: string;
   created_at: string;
@@ -29,16 +31,18 @@ interface DatabaseAuction {
     id: string;
     name: string;
     category: string;
+    description: string | null;
     quantity: number;
     unit: string;
+    price: number;
     location: string;
+    image_url: string | null;
     farmer_id: string;
-    image_url?: string;
-    profiles: {
-      id: string;
-      name: string;
-      role: string;
-    };
+  } | null;
+  profiles: {
+    id: string;
+    name: string;
+    role: string;
   } | null;
   bids: Array<{
     id: string;
@@ -66,6 +70,7 @@ interface AuctionProduct {
     min_increment: number;
     end_time: string;
     status: string;
+    bid_count: number;
   };
 }
 
@@ -87,67 +92,93 @@ const TraderAuctions = () => {
 
   const fetchAuctions = async () => {
     try {
-      console.log('Fetching auctions...');
       const { data: auctionsData, error: auctionsError } = await supabase
         .from('auctions')
         .select(`
-          *,
-          products!auctions_product_id_fkey (
-            *
+          id,
+          product_id,
+          farmer_id,
+          start_price,
+          current_price,
+          min_increment,
+          quantity,
+          end_time,
+          status,
+          created_at,
+          products:product_id (
+            id,
+            name,
+            category,
+            description,
+            quantity,
+            unit,
+            price,
+            location,
+            image_url,
+            farmer_id
+          ),
+          bids (
+            id,
+            amount,
+            bidder_id,
+            created_at
           )
         `)
         .eq('status', 'active')
-        .order('created_at', { ascending: false });
+        .order('end_time', { ascending: true });
 
-      if (auctionsError) {
-        console.error('Error fetching auctions:', auctionsError);
-        return;
-      }
+      if (auctionsError) throw auctionsError;
 
-      console.log('Fetched auctions:', auctionsData?.length || 0, 'results');
-      if (auctionsData) {
-        // Transform the data
-        const transformedAuctions = auctionsData.map(auction => ({
+      // Get farmer profiles in a separate query
+      const farmerIds = [...new Set(auctionsData?.map(a => a.farmer_id) || [])];
+      const { data: farmerProfiles, error: farmerError } = await supabase
+        .from('profiles')
+        .select('id, name, role')
+        .in('id', farmerIds);
+
+      if (farmerError) throw farmerError;
+
+      // Create a map of farmer profiles
+      const farmerMap = Object.fromEntries(
+        (farmerProfiles || []).map(p => [p.id, p])
+      );
+
+      // Transform the data to match AuctionProduct interface
+      const transformedAuctions = (auctionsData as unknown as DatabaseAuction[])?.map(auction => ({
+        id: auction.products?.id || '',
+        name: auction.products?.name || 'Unknown Product',
+        category: auction.products?.category || 'Uncategorized',
+        quantity: auction.quantity,
+        unit: auction.products?.unit || '',
+        price: auction.current_price,
+        location: auction.products?.location || '',
+        farmer_id: auction.farmer_id,
+        farmer_name: farmerMap[auction.farmer_id]?.name || 'Unknown Farmer',
+        created_at: auction.created_at,
+        image_url: auction.products?.image_url,
+        auction: {
           id: auction.id,
-          name: auction.products?.name || 'Unknown Product',
-          category: auction.products?.category || 'Uncategorized',
-          quantity: auction.quantity || 0,
-          unit: auction.products?.unit || '',
-          price: auction.current_price || auction.start_price,
-          location: auction.products?.location || '',
-          farmer_name: auction.products?.farmer_name || 'Unknown Farmer',
-          farmer_id: auction.farmer_id || '',
-          created_at: auction.created_at,
-          image_url: auction.products?.image_url,
-          auction: {
-            id: auction.id,
-            current_price: auction.current_price,
-            min_increment: auction.min_increment,
-            end_time: auction.end_time,
-            status: auction.status
-          }
-        }));
+          current_price: auction.current_price,
+          min_increment: auction.min_increment,
+          end_time: auction.end_time,
+          status: auction.status,
+          bid_count: auction.bids?.length || 0
+        }
+      })) || [];
 
-        // Extract unique categories and locations for filters, filter out empty values
-        const uniqueCategories = [...new Set(transformedAuctions
-          .map(a => a.category)
-          .filter(category => category && category.trim() !== '')
-        )];
-        const uniqueLocations = [...new Set(transformedAuctions
-          .map(a => a.location)
-          .filter(location => location && location.trim() !== '')
-        )];
-        
-        setCategories(uniqueCategories);
-        setLocations(uniqueLocations);
-        setAuctions(transformedAuctions);
-        setIsLoading(false);
-      }
+      // Get unique categories and locations
+      const uniqueCategories = [...new Set(transformedAuctions.map(a => a.category))];
+      const uniqueLocations = [...new Set(transformedAuctions.map(a => a.location))];
+
+      setCategories(uniqueCategories);
+      setLocations(uniqueLocations);
+      setAuctions(transformedAuctions);
+      setIsLoading(false);
     } catch (error) {
-      console.error('Exception while fetching auctions:', error);
+      console.error('Error fetching auctions:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch auctions. Please try again later.",
+        description: "Failed to load auctions. Please try again.",
         variant: "destructive"
       });
       setIsLoading(false);
@@ -155,43 +186,34 @@ const TraderAuctions = () => {
   };
 
   useEffect(() => {
-    console.log('Setting up auction subscriptions and initial fetch...');
-    
-    // Initial fetch
     fetchAuctions();
-
-    // Set up real-time subscriptions
-    const channel = supabase
-      .channel('auctions-channel')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'auctions',
-      }, () => {
-        console.log('Auction changes detected, refreshing...');
-        fetchAuctions();
-      })
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-      });
-
-    // Set up polling interval as backup
+    
+    // Set up a refresh interval
     const interval = setInterval(() => {
-      console.log('Polling interval triggered');
       fetchAuctions();
-    }, 30000);
-
+    }, 30000); // Refresh every 30 seconds
+    
     setRefreshInterval(interval);
-
-    // Cleanup function
+    
+    // Set up real-time subscription for auctions
+    const channel = supabase
+      .channel('auction-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'auctions' }, 
+        () => {
+          console.log('Auction change detected, refreshing...');
+          fetchAuctions();
+        }
+      )
+      .subscribe();
+    
     return () => {
-      console.log('Cleaning up subscriptions...');
-      channel.unsubscribe();
-      if (interval) {
-        clearInterval(interval);
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
       }
+      supabase.removeChannel(channel);
     };
-  }, []); // Empty dependency array to run only once
+  }, []);
 
   const filteredAuctions = auctions.filter(auction => {
     const matchesSearch = 
@@ -221,72 +243,38 @@ const TraderAuctions = () => {
       return `${days}d ${hours}h`;
     } else if (hours > 0) {
       return `${hours}h ${minutes}m`;
-    } else {
+    } else if (minutes > 0) {
       return `${minutes}m`;
+    } else {
+      return "Ending soon";
     }
   };
 
-  const handleBid = async () => {
-    if (!selectedAuction || !profile?.id || isBidding) return;
+  const placeBid = async (auctionId: string, amount: number) => {
+    if (!profile) return;
 
-    const bidValue = parseFloat(bidAmount);
-    if (isNaN(bidValue)) {
-      toast({
-        title: "Invalid Bid",
-        description: "Please enter a valid bid amount.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (bidValue <= selectedAuction.auction.current_price) {
-      toast({
-        title: "Invalid Bid",
-        description: "Bid must be higher than the current price.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (bidValue < selectedAuction.auction.current_price + selectedAuction.auction.min_increment) {
-      toast({
-        title: "Invalid Bid",
-        description: `Minimum bid increment is ${formatCurrency(selectedAuction.auction.min_increment)}.`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsBidding(true);
     try {
-      // Insert the bid
+      const auction = auctions.find(a => a.auction.id === auctionId);
+      if (!auction) return;
+
       const { error: bidError } = await supabase
         .from('bids')
         .insert({
-          product_id: selectedAuction.id,
+          product_id: auction.id,
           bidder_id: profile.id,
-          bidder_name: profile.name || '',
-          amount: bidValue,
+          bidder_name: profile.name,
+          amount: amount,
           status: 'pending'
         });
 
       if (bidError) throw bidError;
-
-      // Update auction current price
-      const { error: updateError } = await supabase
-        .from('auctions')
-        .update({ current_price: bidValue })
-        .eq('id', selectedAuction.auction.id);
-
-      if (updateError) throw updateError;
 
       toast({
         title: "Bid Placed",
         description: "Your bid has been successfully placed.",
       });
 
-      setSelectedAuction(null);
-      setBidAmount("");
+      // Refresh auctions to show updated bid
       fetchAuctions();
     } catch (error) {
       console.error('Error placing bid:', error);
@@ -295,8 +283,6 @@ const TraderAuctions = () => {
         description: "Failed to place bid. Please try again.",
         variant: "destructive"
       });
-    } finally {
-      setIsBidding(false);
     }
   };
 
@@ -304,170 +290,111 @@ const TraderAuctions = () => {
     <DashboardLayout userRole="trader">
       <DashboardHeader title="Auctions" userName={profile?.name || ""} userRole="trader" />
       
-      <div className="grid gap-6">
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-              <div>
-                <CardTitle>Active Auctions</CardTitle>
-                <CardDescription>Browse and participate in agricultural product auctions</CardDescription>
-              </div>
-              <div className="flex gap-4">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Search auctions..."
-                    className="pl-8"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Categories</SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category || "uncategorized"}>
-                        {category || "Uncategorized"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={locationFilter} onValueChange={setLocationFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Locations</SelectItem>
-                    {locations.map((location) => (
-                      <SelectItem key={location} value={location || "unknown"}>
-                        {location || "Unknown Location"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row justify-between md:items-center">
+            <div>
+              <CardTitle>Active Auctions</CardTitle>
+              <CardDescription>Browse and bid on agricultural products</CardDescription>
             </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center items-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin" />
+            <div className="flex gap-4 mt-4 md:mt-0">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search auctions..."
+                  className="pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
-            ) : filteredAuctions.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No active auctions found</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredAuctions.map((auction) => (
-                  <Card key={auction.id} className="flex flex-col">
-                    <CardHeader>
-                      <div className="flex justify-between items-start gap-4">
-                        <div>
-                          <CardTitle className="text-lg">{auction.name}</CardTitle>
-                          <CardDescription>{auction.farmer_name}</CardDescription>
-                        </div>
-                        <Badge variant="secondary">
-                          {auction.category}
-                        </Badge>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={locationFilter} onValueChange={setLocationFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Locations</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location} value={location}>
+                      {location}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredAuctions.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredAuctions.map((auction) => (
+                <Card key={auction.id} className="flex flex-col">
+                  <CardContent className="flex-1">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Quantity:</span>
+                        <span>{auction.quantity} {auction.unit}</span>
                       </div>
-                    </CardHeader>
-                    <CardContent className="flex-1">
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Quantity:</span>
-                          <span>{auction.quantity} {auction.unit}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Starting Price:</span>
-                          <span>{formatCurrency(auction.price)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Current Bid:</span>
-                          <span className="font-semibold text-lg">
-                            {formatCurrency(auction.auction.current_price)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Time Left:</span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {calculateTimeLeft(auction.auction.end_time)}
-                          </span>
-                        </div>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button 
-                              className="w-full" 
-                              onClick={() => {
-                                setSelectedAuction(auction);
-                                setBidAmount((auction.auction.current_price + auction.auction.min_increment).toString());
-                              }}
-                            >
-                              <Gavel className="mr-2 h-4 w-4" />
-                              Place Bid
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Place a Bid</DialogTitle>
-                              <DialogDescription>
-                                Enter your bid amount for {auction.name}
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                  <span>Current Price:</span>
-                                  <span>{formatCurrency(auction.auction.current_price)}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span>Minimum Increment:</span>
-                                  <span>{formatCurrency(auction.auction.min_increment)}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                  <span>Minimum Bid:</span>
-                                  <span>{formatCurrency(auction.auction.current_price + auction.auction.min_increment)}</span>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <label htmlFor="bidAmount" className="text-sm font-medium">
-                                  Your Bid
-                                </label>
-                                <Input
-                                  id="bidAmount"
-                                  type="number"
-                                  step="0.01"
-                                  value={bidAmount}
-                                  onChange={(e) => setBidAmount(e.target.value)}
-                                  placeholder="Enter bid amount"
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button
-                                onClick={handleBid}
-                                disabled={isBidding}
-                              >
-                                {isBidding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Confirm Bid
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Starting Price:</span>
+                        <span>{formatCurrency(auction.price)}</span>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Current Bid:</span>
+                        <span className="font-semibold text-lg">
+                          {formatCurrency(auction.auction.current_price)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Total Bids:</span>
+                        <span>{auction.auction.bid_count}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Time Left:</span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          {calculateTimeLeft(auction.auction.end_time)}
+                        </span>
+                      </div>
+                      <BidDialog
+                        auction={auction.auction}
+                        onBid={(amount) => placeBid(auction.auction.id, amount)}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                <Gavel className="h-8 w-8 text-muted-foreground" />
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              <h3 className="text-lg font-medium mb-2">No auctions found</h3>
+              <p className="text-muted-foreground mb-6">
+                Try adjusting your filters or search terms
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </DashboardLayout>
   );
 };

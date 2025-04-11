@@ -37,6 +37,7 @@ const ProductDetail = () => {
   const [userRole, setUserRole] = useState<"farmer" | "trader">("farmer");
   const [loading, setLoading] = useState(true);
   const [product, setProduct] = useState<any>(null);
+  const [priceHistory, setPriceHistory] = useState<any[]>([]);
   
   useEffect(() => {
     const fetchProduct = async () => {
@@ -48,10 +49,12 @@ const ProductDetail = () => {
           .from('products')
           .select(`
             *,
-            farmer:farmer_id (
+            profiles:farmer_id (
               id,
               name,
-              avatar_url
+              avatar_url,
+              email,
+              phone
             )
           `)
           .eq('id', id)
@@ -67,6 +70,17 @@ const ProductDetail = () => {
           });
           navigate(userRole === "farmer" ? "/farmer-products" : "/trader-market");
           return;
+        }
+
+        // Fetch price history if available
+        const { data: priceData, error: priceError } = await supabase
+          .from('product_price_history')
+          .select('*')
+          .eq('product_id', id)
+          .order('created_at', { ascending: false });
+
+        if (!priceError) {
+          setPriceHistory(priceData || []);
         }
 
         setProduct(productData);
@@ -96,13 +110,11 @@ const ProductDetail = () => {
   }, []);
 
   // Check if current user is the product owner
-  const isProductOwner = profile?.id === product?.farmer_id;
-  
-  // Add handleDelete function
+  const isProductOwner = profile?.id === product?.profiles?.id;
+
   const handleDelete = async () => {
     if (!id || !profile?.id) return;
 
-    // Confirm deletion
     if (!window.confirm("Are you sure you want to delete this product?")) {
       return;
     }
@@ -131,6 +143,20 @@ const ProductDetail = () => {
       });
     }
   };
+
+  const handleOrderCreate = () => {
+    if (userRole === "trader") {
+      navigate(`/trader-order-create/${id}`);
+    }
+  };
+
+  const handleAuctionCreate = () => {
+    if (userRole === "farmer") {
+      navigate(`/farmer-auctions/create?product=${id}`);
+    } else {
+      navigate(`/trader-auctions/${id}`);
+    }
+  };
   
   if (loading) {
     return (
@@ -149,7 +175,7 @@ const ProductDetail = () => {
   const renderFarmerActions = () => (
     <div className="flex flex-col sm:flex-row gap-3">
       {product.status === "active" && (
-        <Button onClick={() => navigate(`/farmer-auctions/create?product=${id}`)}>
+        <Button onClick={handleAuctionCreate}>
           <Gavel className="mr-2 h-4 w-4" />
           Create Auction
         </Button>
@@ -168,18 +194,18 @@ const ProductDetail = () => {
   const renderTraderActions = () => (
     <div className="flex flex-col sm:flex-row gap-3">
       {product.status === "active" ? (
-        <Button className="bg-agri-trader" onClick={() => navigate(`/trader-orders/create/${id}`)}>
+        <Button className="bg-agri-trader" onClick={handleOrderCreate}>
           <ShoppingCart className="mr-2 h-4 w-4" />
           Purchase Now
         </Button>
       ) : product.status === "in_auction" && (
-        <Button className="bg-agri-trader" onClick={() => navigate(`/trader-auctions/${id}`)}>
+        <Button className="bg-agri-trader" onClick={handleAuctionCreate}>
           <Gavel className="mr-2 h-4 w-4" />
           View Auction
         </Button>
       )}
       {!isProductOwner && (
-        <Button variant="outline" onClick={() => {}}>
+        <Button variant="outline" onClick={() => navigate('/messages', { state: { userId: product.farmer_id } })}>
           <MessageCircle className="mr-2 h-4 w-4" />
           Contact Seller
         </Button>
@@ -288,7 +314,7 @@ const ProductDetail = () => {
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="specifications" className="mt-4">
+                <TabsContent value="specifications" className="space-y-4">
                   <div className="space-y-4">
                     <h3 className="font-medium">Product Specifications</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -312,11 +338,15 @@ const ProductDetail = () => {
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="price-history" className="mt-4">
+                <TabsContent value="price-history" className="space-y-4">
                   <div className="space-y-4">
                     <h3 className="font-medium">Price History</h3>
                     <div className="h-64 w-full bg-muted/50 rounded-md flex items-center justify-center">
-                      <BarChart3 className="h-12 w-12 text-muted-foreground" />
+                      {priceHistory.length > 0 ? (
+                        <BarChart3 className="h-12 w-12 text-muted-foreground" />
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No price history available</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between">
@@ -334,21 +364,21 @@ const ProductDetail = () => {
           </Card>
         </div>
         
-        <div>
-          <Card className="mb-6">
+        <div className="space-y-6">
+          <Card>
             <CardHeader>
               <CardTitle>Seller Information</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center space-x-4 mb-4">
                 <Avatar className="h-12 w-12">
-                  <AvatarImage src={product.farmer?.avatar_url} />
+                  <AvatarImage src={product.profiles?.avatar_url} />
                   <AvatarFallback>
-                    {product.farmer?.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
+                    {product.profiles?.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <div className="font-medium">{product.farmer?.name}</div>
+                  <div className="font-medium">{product.profiles?.name}</div>
                   <div className="text-sm text-muted-foreground">{product.location}</div>
                 </div>
               </div>
@@ -356,7 +386,7 @@ const ProductDetail = () => {
               <div className="space-y-3">
                 <div className="text-sm font-medium">Contact Information</div>
                 {!isProductOwner && (
-                  <Button variant="outline" className="w-full" onClick={() => {}}>
+                  <Button variant="outline" className="w-full" onClick={() => navigate('/messages', { state: { userId: product.farmer_id } })}>
                     <MessageCircle className="mr-2 h-4 w-4" />
                     Contact Seller
                   </Button>

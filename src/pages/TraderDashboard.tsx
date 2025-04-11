@@ -1,4 +1,4 @@
-import { BarChart3, Wallet, ShoppingCart, Gavel, ArrowUpRight, Search, ShoppingBag } from "lucide-react";
+import { BarChart3, Wallet, ShoppingCart, Gavel, ArrowUpRight, ShoppingBag } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import StatCard from "@/components/dashboard/StatCard";
@@ -28,18 +28,29 @@ const TraderDashboard = () => {
     totalOrders: 0,
     totalRevenue: 0,
     pendingOrders: 0,
-    recentOrders: []
+    recentOrders: [],
+    changes: {
+      orders: { value: "0%", positive: true },
+      auctions: { value: "0%", positive: true },
+      revenue: { value: "0%", positive: true },
+      pendingOrders: { value: "0%", positive: true }
+    }
   });
 
   const fetchDashboardData = async () => {
     if (!profile?.id) return;
 
     try {
+      const now = new Date();
+      const currentPeriodStart = new Date(now.getFullYear(), now.getMonth(), 1); // Start of current month
+      const previousPeriodStart = new Date(now.getFullYear(), now.getMonth() - 1, 1); // Start of previous month
+
       // Fetch active auctions with proper joins and filters
-      const { data: auctions, error: auctionsError } = await supabase
+      const { data: currentAuctions, error: auctionsError } = await supabase
         .from('auctions')
         .select('*')
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .gt('end_time', now.toISOString());
 
       if (auctionsError) {
         console.error('Error fetching auctions:', {
@@ -51,12 +62,27 @@ const TraderDashboard = () => {
         throw auctionsError;
       }
 
-      console.log('Raw auctions data:', auctions); // Debug log
+      // Fetch previous period auctions for comparison
+      const { data: previousAuctions } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('status', 'active')
+        .gte('created_at', previousPeriodStart.toISOString())
+        .lt('created_at', currentPeriodStart.toISOString());
+
+      // Calculate auction change
+      const currentAuctionCount = currentAuctions?.length || 0;
+      const previousAuctionCount = previousAuctions?.length || 0;
+      const auctionChange = previousAuctionCount > 0 
+        ? Math.round(((currentAuctionCount - previousAuctionCount) / previousAuctionCount) * 100)
+        : 0;
+
+      console.log('Raw auctions data:', currentAuctions); // Debug log
 
       // If we get auctions, then try to fetch their product details
       let processedAuctions = [];
-      if (auctions && auctions.length > 0) {
-        const productIds = auctions.map(auction => auction.product_id);
+      if (currentAuctions && currentAuctions.length > 0) {
+        const productIds = currentAuctions.map(auction => auction.product_id);
         
         const { data: products, error: productsError } = await supabase
           .from('products')
@@ -82,7 +108,7 @@ const TraderDashboard = () => {
         }, {});
 
         // Process auctions with product data
-        processedAuctions = auctions.map(auction => {
+        processedAuctions = currentAuctions.map(auction => {
           const product = productsMap[auction.product_id];
           return {
             id: auction.id,
@@ -102,11 +128,13 @@ const TraderDashboard = () => {
 
       console.log('Processed auctions:', processedAuctions); // Debug log
 
-      // Fetch orders statistics
-      const { data: orders, error: ordersError } = await supabase
+      // Fetch current period orders
+      const { data: currentOrders, error: ordersError } = await supabase
         .from('orders')
         .select('*, products (*)')
-        .eq('trader_id', profile.id);
+        .eq('trader_id', profile.id)
+        .gte('created_at', currentPeriodStart.toISOString())
+        .lte('created_at', now.toISOString());
 
       if (ordersError) {
         console.error('Error fetching orders:', {
@@ -118,12 +146,39 @@ const TraderDashboard = () => {
         throw ordersError;
       }
 
-      console.log('Fetched orders:', orders); // Debug log
+      // Fetch previous period orders
+      const { data: previousOrders } = await supabase
+        .from('orders')
+        .select('*, products (*)')
+        .eq('trader_id', profile.id)
+        .gte('created_at', previousPeriodStart.toISOString())
+        .lt('created_at', currentPeriodStart.toISOString());
 
-      // Calculate product categories distribution
+      // Calculate order changes
+      const currentOrderCount = currentOrders?.length || 0;
+      const previousOrderCount = previousOrders?.length || 0;
+      const orderChange = previousOrderCount > 0
+        ? Math.round(((currentOrderCount - previousOrderCount) / previousOrderCount) * 100)
+        : 0;
+
+      // Calculate revenue changes
+      const currentRevenue = currentOrders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+      const previousRevenue = previousOrders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+      const revenueChange = previousRevenue > 0
+        ? Math.round(((currentRevenue - previousRevenue) / previousRevenue) * 100)
+        : 0;
+
+      // Calculate pending orders change
+      const currentPendingOrders = currentOrders?.filter(order => order.status === 'pending').length || 0;
+      const previousPendingOrders = previousOrders?.filter(order => order.status === 'pending').length || 0;
+      const pendingOrderChange = previousPendingOrders > 0
+        ? Math.round(((currentPendingOrders - previousPendingOrders) / previousPendingOrders) * 100)
+        : 0;
+
+      // Fetch products to calculate category distribution
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('category')
+        .select('category, id')
         .eq('status', 'active');
 
       if (productsError) {
@@ -138,33 +193,31 @@ const TraderDashboard = () => {
 
       console.log('Fetched products:', products); // Debug log
 
-      // Process product categories
-      const categoryCounts = products?.reduce((acc, product) => {
+      // Calculate product category distribution
+      const categoryCount = products?.reduce((acc, product) => {
         acc[product.category] = (acc[product.category] || 0) + 1;
         return acc;
       }, {});
 
       const totalProducts = products?.length || 0;
-      const productCategories = Object.entries(categoryCounts || {}).map(([name, count]) => ({
+      const productCategories = Object.entries(categoryCount || {}).map(([name, count]) => ({
         name,
         value: Math.round((count as number / totalProducts) * 100)
       }));
 
-      // Calculate order statistics
-      const totalOrders = orders?.length || 0;
-      const totalRevenue = orders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
-      const pendingOrders = orders?.filter(order => order.status === 'pending').length || 0;
-
-      // Get recent orders
-      const recentOrders = orders?.slice(0, 3) || [];
-
       setDashboardData({
         activeAuctions: processedAuctions,
         productCategories,
-        totalOrders,
-        totalRevenue,
-        pendingOrders,
-        recentOrders
+        totalOrders: currentOrderCount,
+        totalRevenue: currentRevenue,
+        pendingOrders: currentPendingOrders,
+        recentOrders: currentOrders?.slice(0, 3) || [],
+        changes: {
+          orders: { value: `${Math.abs(orderChange)}%`, positive: orderChange >= 0 },
+          auctions: { value: `${Math.abs(auctionChange)}%`, positive: auctionChange >= 0 },
+          revenue: { value: `${Math.abs(revenueChange)}%`, positive: revenueChange >= 0 },
+          pendingOrders: { value: `${Math.abs(pendingOrderChange)}%`, positive: pendingOrderChange >= 0 }
+        }
       });
 
       setIsLoading(false);
@@ -242,25 +295,25 @@ const TraderDashboard = () => {
           title="Total Orders" 
           value={dashboardData.totalOrders.toString()} 
           icon={ShoppingCart}
-          change={{ value: "12%", positive: true }}
+          change={dashboardData.changes.orders}
         />
         <StatCard 
           title="Active Auctions" 
           value={dashboardData.activeAuctions.length.toString()} 
           icon={Gavel}
-          change={{ value: "2", positive: true }}
+          change={dashboardData.changes.auctions}
         />
         <StatCard 
           title="Total Revenue" 
           value={formatCurrency(dashboardData.totalRevenue)} 
           icon={Wallet}
-          change={{ value: "8.5%", positive: true }}
+          change={dashboardData.changes.revenue}
         />
         <StatCard 
           title="Pending Orders" 
           value={dashboardData.pendingOrders.toString()} 
           icon={ShoppingBag}
-          change={{ value: "1", positive: false }}
+          change={dashboardData.changes.pendingOrders}
         />
       </div>
 
@@ -271,46 +324,40 @@ const TraderDashboard = () => {
             <CardDescription>Current auctions you can participate in</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Current Bid</TableHead>
-                  <TableHead>Time Left</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dashboardData.activeAuctions.map((auction) => (
-                  <TableRow key={auction.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{auction.name}</div>
-                        <div className="text-xs text-muted-foreground">by {auction.profiles?.name}</div>
+            <div className="space-y-4">
+              {dashboardData.activeAuctions.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  No active auctions
+                </div>
+              ) : (
+                dashboardData.activeAuctions.map((auction) => (
+                  <div
+                    key={auction.id}
+                    className="flex items-center justify-between p-4 rounded-lg border bg-card"
+                  >
+                    <div className="space-y-1">
+                      <p className="font-medium">{auction.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {auction.quantity} {auction.unit}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="font-semibold">{formatCurrency(auction.price)}</p>
+                        <p className="text-sm text-muted-foreground">{auction.location}</p>
                       </div>
-                    </TableCell>
-                    <TableCell>{`${auction.quantity} ${auction.unit}`}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(auction.price)}/{auction.unit}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                        Active
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="default" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => navigate(`/trader-auctions/${auction.id}`)}
-                        className="bg-agri-trader"
                       >
-                        Bid Now
+                        <ArrowUpRight className="h-4 w-4" />
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -325,12 +372,12 @@ const TraderDashboard = () => {
                 <PieChart>
                   <Pie
                     data={dashboardData.productCategories}
+                    dataKey="value"
+                    nameKey="name"
                     cx="50%"
                     cy="50%"
-                    labelLine={false}
                     outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
+                    label
                   >
                     {dashboardData.productCategories.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -344,41 +391,6 @@ const TraderDashboard = () => {
           </CardContent>
         </Card>
       </div>
-
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Quick Market Search</CardTitle>
-          <CardDescription>Find products by name, type, or farmer</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search for products..."
-                className="pl-8"
-              />
-            </div>
-            <Button onClick={() => navigate("/trader-market")} className="bg-agri-trader">
-              <Search className="mr-2 h-4 w-4" />
-              Search Market
-            </Button>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {dashboardData.productCategories.map((category) => (
-              <Badge 
-                key={category.name}
-                variant="outline" 
-                className="cursor-pointer hover:bg-muted"
-                onClick={() => navigate(`/trader-market?category=${category.name}`)}
-              >
-                {category.name}
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </DashboardLayout>
   );
 };

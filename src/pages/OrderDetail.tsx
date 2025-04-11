@@ -74,37 +74,44 @@ const OrderDetail = () => {
               quality,
               location,
               image_url
-            ),
-            farmer:farmer_id (
-              id,
-              name,
-              phone,
-              address,
-              city,
-              state,
-              pincode
-            ),
-            trader:trader_id (
-              id,
-              name,
-              phone,
-              address,
-              city,
-              state,
-              pincode
             )
           `)
           .eq('id', id)
           .single();
         
         if (orderError) throw orderError;
+
+        // Fetch farmer profile
+        const { data: farmerData, error: farmerError } = await supabase
+          .from('profiles')
+          .select('id, name, phone, address, city, state, pincode')
+          .eq('id', orderData.farmer_id)
+          .single();
+
+        if (farmerError) throw farmerError;
+
+        // Fetch trader profile
+        const { data: traderData, error: traderError } = await supabase
+          .from('profiles')
+          .select('id, name, phone, address, city, state, pincode')
+          .eq('id', orderData.trader_id)
+          .single();
+
+        if (traderError) throw traderError;
+
+        // Combine all data
+        const completeOrderData = {
+          ...orderData,
+          farmer: farmerData,
+          trader: traderData
+        };
         
-        setOrder(orderData);
+        setOrder(completeOrderData);
         
         if (userRole === 'farmer') {
-          setOtherParty(orderData.trader);
+          setOtherParty(completeOrderData.trader);
         } else {
-          setOtherParty(orderData.farmer);
+          setOtherParty(completeOrderData.farmer);
         }
         
         const { data: shipmentData, error: shipmentError } = await supabase

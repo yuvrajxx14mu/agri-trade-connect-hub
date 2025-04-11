@@ -1,9 +1,7 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
 
 interface Bid {
   id: string;
@@ -15,59 +13,10 @@ interface Bid {
 }
 
 interface BidHistoryProps {
-  productId: string;
-  onBidUpdate?: () => void;
+  bids: Bid[];
 }
 
-const BidHistory = ({ productId, onBidUpdate }: BidHistoryProps) => {
-  const [bids, setBids] = useState<Bid[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchBids = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('bids')
-        .select('*')
-        .eq('product_id', productId)
-        .order('amount', { ascending: false });
-
-      if (error) throw error;
-
-      setBids(data || []);
-    } catch (error) {
-      console.error('Error fetching bids:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchBids();
-
-    // Set up real-time subscription for new bids
-    const channel = supabase
-      .channel('bid-history')
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'bids', filter: `product_id=eq.${productId}` }, 
-        () => {
-          fetchBids();
-          if (onBidUpdate) onBidUpdate();
-        }
-      )
-      .on('postgres_changes', 
-        { event: 'UPDATE', schema: 'public', table: 'bids', filter: `product_id=eq.${productId}` }, 
-        () => {
-          fetchBids();
-          if (onBidUpdate) onBidUpdate();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [productId, onBidUpdate]);
-
+const BidHistory = ({ bids }: BidHistoryProps) => {
   const getBidStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'accepted':
@@ -81,45 +30,33 @@ const BidHistory = ({ productId, onBidUpdate }: BidHistoryProps) => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Bid History</CardTitle>
-        <CardDescription>Recent bids for this auction</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="text-center py-4">
-            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+    <div className="space-y-4">
+      {bids.length === 0 ? (
+        <div className="text-center py-4 text-muted-foreground">
+          No bids placed yet
+        </div>
+      ) : (
+        bids.map((bid) => (
+          <div
+            key={bid.id}
+            className="flex items-center justify-between p-4 rounded-lg border bg-card"
+          >
+            <div className="space-y-1">
+              <p className="font-medium">{bid.bidder_name}</p>
+              <p className="text-sm text-muted-foreground">
+                {formatDistanceToNow(new Date(bid.created_at), { addSuffix: true })}
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <p className="font-semibold">{formatCurrency(bid.amount)}</p>
+              <Badge variant="outline" className={getBidStatusColor(bid.status)}>
+                {bid.status}
+              </Badge>
+            </div>
           </div>
-        ) : bids.length === 0 ? (
-          <div className="text-center py-4 text-muted-foreground">
-            No bids placed yet
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {bids.map((bid) => (
-              <div
-                key={bid.id}
-                className="flex items-center justify-between p-4 rounded-lg border bg-card"
-              >
-                <div className="space-y-1">
-                  <p className="font-medium">{bid.bidder_name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDistanceToNow(new Date(bid.created_at), { addSuffix: true })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <p className="font-semibold">{formatCurrency(bid.amount)}</p>
-                  <Badge variant="outline" className={getBidStatusColor(bid.status)}>
-                    {bid.status}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        ))
+      )}
+    </div>
   );
 };
 

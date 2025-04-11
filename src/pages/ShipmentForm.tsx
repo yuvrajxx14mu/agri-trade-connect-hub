@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -84,7 +83,7 @@ const ShipmentForm = () => {
             product_id,
             quantity,
             trader_id,
-            profiles!orders_trader_id_fkey(name)
+            products!orders_product_id_fkey(name)
           `)
           .eq('farmer_id', profile.id)
           .eq('status', 'completed')

@@ -38,10 +38,6 @@ update on appointments for EACH row
 execute FUNCTION update_updated_at_column ();
 
 
-
----------------------------------
-
-
 create table public.auctions (
   id uuid not null default gen_random_uuid (),
   product_id uuid null,
@@ -65,10 +61,6 @@ create table public.auctions (
   constraint auctions_farmer_id_fkey foreign KEY (farmer_id) references auth.users (id),
   constraint auctions_product_id_fkey foreign KEY (product_id) references products (id)
 ) TABLESPACE pg_default;
-
-
-------------------------------
-
 
 
 create table public.bids (
@@ -102,8 +94,6 @@ update on bids for EACH row
 execute FUNCTION update_updated_at_column ();
 
 
------------------------------
-
 
 create table public.business_details (
   id uuid not null default gen_random_uuid (),
@@ -128,8 +118,6 @@ update on business_details for EACH row
 execute FUNCTION update_updated_at_column ();
 
 
------------------------------------
-
 
 create table public.categories (
   id uuid not null default gen_random_uuid (),
@@ -145,9 +133,6 @@ create trigger update_categories_updated_at BEFORE
 update on categories for EACH row
 execute FUNCTION update_updated_at_column ();
 
-
-
-------------------------------
 
 
 create table public.dashboard_metrics (
@@ -169,8 +154,6 @@ update on dashboard_metrics for EACH row
 execute FUNCTION update_updated_at_column ();
 
 
---------------------------------
-
 
 create table public.disputes (
   id uuid not null default gen_random_uuid (),
@@ -191,9 +174,6 @@ create table public.disputes (
 create trigger update_disputes_updated_at BEFORE
 update on disputes for EACH row
 execute FUNCTION update_updated_at_column ();
-
-
--------------------------------------
 
 
 
@@ -218,9 +198,6 @@ create trigger update_documents_updated_at BEFORE
 update on documents for EACH row
 execute FUNCTION update_updated_at_column ();
 
-
-
---------  ----------- 
 
 
 
@@ -249,10 +226,6 @@ execute FUNCTION update_updated_at_column ();
 
 
 
---------------------------------
-
-
-
 create table public.locations (
   id uuid not null default gen_random_uuid (),
   name text not null,
@@ -269,12 +242,6 @@ create table public.locations (
 create trigger update_locations_updated_at BEFORE
 update on locations for EACH row
 execute FUNCTION update_updated_at_column ();
-
-
-
-
---------------------------------
-
 
 
 
@@ -299,12 +266,6 @@ create table public.market_rates (
 create trigger update_market_rates_timestamp BEFORE
 update on market_rates for EACH row
 execute FUNCTION update_updated_at_column ();
-
-
-
-
---------------------------------
-
 
 
 
@@ -334,11 +295,6 @@ execute FUNCTION update_updated_at_column ();
 
 
 
-----------------------------------
-
-
-
-
 create table public.notification_settings (
   id uuid not null default gen_random_uuid (),
   user_id uuid not null,
@@ -349,10 +305,6 @@ create table public.notification_settings (
   constraint notification_settings_user_id_key unique (user_id),
   constraint notification_settings_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE
 ) TABLESPACE pg_default;
-
-
-
---------------------------------
 
 
 
@@ -376,8 +328,6 @@ update on notifications for EACH row
 execute FUNCTION update_updated_at_column ();
 
 
-
---------------------------------
 
 
 create table public.orders (
@@ -430,8 +380,6 @@ execute FUNCTION update_updated_at_column ();
 
 
 
---------------------------------
-
 
 create table public.payments (
   id uuid not null default gen_random_uuid (),
@@ -450,11 +398,6 @@ create table public.payments (
 create trigger update_payments_updated_at BEFORE
 update on payments for EACH row
 execute FUNCTION update_updated_at_column ();
-
-
-
-
-----------------  -----
 
 
 
@@ -477,8 +420,6 @@ execute FUNCTION update_updated_at_column ();
 
 
 
-------------------------------
-
 
 create table public.products (
   id uuid not null default gen_random_uuid (),
@@ -499,9 +440,7 @@ create table public.products (
   updated_at timestamp with time zone not null default now(),
   category_id uuid null,
   location_id uuid null,
-  auction_id uuid null,
   constraint products_pkey primary key (id),
-  constraint products_auction_id_fkey foreign KEY (auction_id) references auctions (id),
   constraint products_category_id_fkey foreign KEY (category_id) references categories (id),
   constraint products_farmer_id_fkey foreign KEY (farmer_id) references auth.users (id) on delete CASCADE,
   constraint products_location_id_fkey foreign KEY (location_id) references locations (id),
@@ -518,9 +457,6 @@ create trigger update_products_timestamp BEFORE
 update on products for EACH row
 execute FUNCTION update_updated_at_column ();
 
-
-
-------------------------------
 
 
 
@@ -556,10 +492,6 @@ execute FUNCTION update_updated_at_column ();
 
 
 
-------------------------------
-
-
-
 
 
 create table public.quality_standards (
@@ -580,8 +512,6 @@ execute FUNCTION update_updated_at_column ();
 
 
 
-------------------------------
-
 
 
 create table public.reports (
@@ -600,9 +530,6 @@ create trigger update_reports_updated_at BEFORE
 update on reports for EACH row
 execute FUNCTION update_updated_at_column ();
 
-
-
-------------------------------
 
 
 
@@ -632,7 +559,6 @@ update on reviews for EACH row
 execute FUNCTION update_updated_at_column ();
 
 
-------------------------------
 
 
 
@@ -685,8 +611,6 @@ update on shipments for EACH row
 execute FUNCTION update_updated_at_column ();
 
 
-------------------------------
-
 
 
 create table public.user_preferences (
@@ -705,10 +629,6 @@ create table public.user_preferences (
 create trigger update_user_preferences_updated_at BEFORE
 update on user_preferences for EACH row
 execute FUNCTION update_updated_at_column ();
-
-
-
-------------------------------
 
 
 

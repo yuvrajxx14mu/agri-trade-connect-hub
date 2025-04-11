@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,11 +37,7 @@ const ProductCard = ({
     if (userRole === "farmer") {
       navigate(`/farmer-products/${id}`);
     } else {
-      if (isAuction) {
-        navigate(`/trader-auctions/${id}`);
-      } else {
-        navigate(`/trader-products/${id}`);
-      }
+      navigate(`/trader-market/${id}`);
     }
   };
 

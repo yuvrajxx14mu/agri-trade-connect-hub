@@ -73,10 +73,16 @@ const AuthProviderContent = ({
         setSession(null);
         setUser(null);
         setProfile(null);
+        localStorage.clear();
         return;
       }
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // Clear existing state before setting new state
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        
         setSession(currentSession);
         setUser(currentSession.user);
         
@@ -174,12 +180,17 @@ const AuthProviderContent = ({
 
       if (error) throw error;
 
-      // Auth state change listener will handle session update
+      // Clear any existing state
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+
+      // Force a full page reload to ensure clean state
       const roleRedirect = data.user?.user_metadata?.role === 'farmer' 
         ? '/farmer-dashboard' 
         : '/trader-dashboard';
       
-      navigate(roleRedirect);
+      window.location.href = roleRedirect;
     } catch (error) {
       setLoading(false);
       throw error;
@@ -221,7 +232,11 @@ const AuthProviderContent = ({
       setUser(null);
       setProfile(null);
       
-      navigate('/auth');
+      // Clear any cached data in localStorage
+      localStorage.clear();
+      
+      // Force a full page reload to clear all state
+      window.location.href = '/auth';
     } catch (error) {
       console.error('Error signing out:', error);
     } finally {

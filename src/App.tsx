@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -181,7 +180,12 @@ const App = () => (
                 <TraderMarket />
               </ProtectedRoute>
             } />
-            <Route path="/trader-orders/create/:id" element={
+            <Route path="/trader-products/:id" element={
+              <ProtectedRoute requiredRole="trader">
+                <ProductDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/trader-order-create/:id" element={
               <ProtectedRoute requiredRole="trader">
                 <TraderOrderCreate />
               </ProtectedRoute>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -25,26 +24,37 @@ const FarmerOrders = () => {
       if (!profile?.id) return;
       
       try {
-        const { data, error } = await supabase
+        const { data: ordersData, error: ordersError } = await supabase
           .from('orders')
-          .select(`
-            id,
-            created_at,
-            status,
-            payment_status,
-            quantity,
-            price,
-            total_amount,
-            trader_id,
-            profiles(name),
-            products(name)
-          `)
+          .select('*')
           .eq('farmer_id', profile.id)
           .order('created_at', { ascending: false });
           
-        if (error) throw error;
+        if (ordersError) throw ordersError;
         
-        setOrders(data || []);
+        const ordersWithDetails = await Promise.all(
+          ordersData.map(async (order) => {
+            const { data: traderData } = await supabase
+              .from('profiles')
+              .select('name')
+              .eq('id', order.trader_id)
+              .single();
+            
+            const { data: productData } = await supabase
+              .from('products')
+              .select('name')
+              .eq('id', order.product_id)
+              .single();
+            
+            return {
+              ...order,
+              profiles: traderData,
+              products: productData,
+            };
+          })
+        );
+
+        setOrders(ordersWithDetails);
       } catch (error) {
         console.error('Error fetching orders:', error);
       } finally {
