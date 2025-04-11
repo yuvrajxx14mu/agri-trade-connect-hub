@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -40,13 +39,22 @@ export const useBusinessData = (userId?: string) => {
       
       const { data: businessData, error: businessError } = await fetchBusinessDetails(userId);
       
-      if (!businessError && businessData) {
+      if (businessError) {
+        console.error('Error fetching business details:', businessError);
+        setupEmptyBusinessData();
+        return;
+      }
+      
+      if (businessData) {
         setBusinessDetails(businessData);
         
         try {
           const { data, error: extBusinessError } = await fetchExtendedBusinessData(businessData.id || '');
             
-          if (!extBusinessError && data) {
+          if (extBusinessError) {
+            console.error('Error fetching extended business data:', extBusinessError);
+            setupDefaultBusinessData(businessData);
+          } else if (data) {
             const typedData = data as BusinessExtendedDataResponse;
             const extendedData: ExtendedBusinessData = {
               designation: typedData.designation || 'Director of Procurement',
@@ -55,8 +63,6 @@ export const useBusinessData = (userId?: string) => {
             };
             setExtendedBusinessData(extendedData);
             setCompanyFormData(mapBusinessToCompanyForm(businessData, extendedData));
-          } else {
-            setupDefaultBusinessData(businessData);
           }
         } catch (extError) {
           console.error('Error fetching extended business data:', extError);

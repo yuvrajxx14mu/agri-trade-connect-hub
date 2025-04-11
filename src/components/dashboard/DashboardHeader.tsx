@@ -1,7 +1,5 @@
-
-import { BellIcon, User } from "lucide-react";
+import { User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import NotificationDropdown from "./NotificationDropdown";
 import UserMenu from "./UserMenu";
 
 interface DashboardHeaderProps {
@@ -17,8 +15,6 @@ const DashboardHeader = ({ title, userName, userRole = "farmer" }: DashboardHead
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         
         <div className="flex items-center gap-4">
-          <NotificationDropdown />
-          
           <UserMenu userName={userName} userRole={userRole} />
         </div>
       </div>

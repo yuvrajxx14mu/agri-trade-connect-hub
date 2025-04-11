@@ -47,8 +47,6 @@ const TraderMarket = () => {
   
   const fetchProducts = async () => {
     try {
-      console.log('Fetching products...');
-      
       const { data: marketProducts, error: productsError } = await supabase
         .from('products')
         .select(`
@@ -69,7 +67,6 @@ const TraderMarket = () => {
         .eq('status', 'active');
 
       if (productsError) throw productsError;
-      console.log('Fetched products:', marketProducts?.length || 0);
 
       // Get unique categories and locations
       const uniqueCategories = [...new Set(marketProducts?.map(p => p.category) || [])];
@@ -80,7 +77,6 @@ const TraderMarket = () => {
       setProducts(marketProducts || []);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching products:', error);
       toast({
         title: "Error",
         description: "Failed to load market products",
@@ -106,7 +102,6 @@ const TraderMarket = () => {
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'products' }, 
         () => {
-          console.log('Product change detected, refreshing...');
           fetchProducts();
         }
       )
@@ -132,9 +127,6 @@ const TraderMarket = () => {
     
     return matchesSearch && matchesCategory && matchesLocation;
   });
-
-  console.log('Total products:', products.length);
-  console.log('Filtered products:', filteredProducts.length);
 
   if (loading) {
     return (

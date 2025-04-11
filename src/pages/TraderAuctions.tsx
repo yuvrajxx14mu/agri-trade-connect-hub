@@ -145,7 +145,7 @@ const TraderAuctions = () => {
 
       // Transform the data to match AuctionProduct interface
       const transformedAuctions = (auctionsData as unknown as DatabaseAuction[])?.map(auction => ({
-        id: auction.products?.id || '',
+        id: auction.product_id || '',
         name: auction.products?.name || 'Unknown Product',
         category: auction.products?.category || 'Uncategorized',
         quantity: auction.quantity,
@@ -205,7 +205,6 @@ const TraderAuctions = () => {
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'auctions' }, 
         () => {
-          console.log('Auction change detected, refreshing...');
           fetchAuctions();
         }
       )
@@ -259,29 +258,72 @@ const TraderAuctions = () => {
 
     try {
       const auction = auctions.find(a => a.auction.id === auctionId);
-      if (!auction) return;
+      if (!auction) {
+        console.error('Auction not found:', auctionId);
+        toast({
+          title: "Error",
+          description: "Auction not found. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Log UUIDs for debugging
+      console.log('Profile ID:', profile.id);
+      console.log('Auction ID:', auction.auction.id);
+      console.log('Product ID:', auction.id);
+
+      // Ensure all UUIDs are correctly set
+      if (!profile.id || !auction.auction.id || !auction.id) {
+        console.error('Missing UUIDs for placing bid:', {
+          profileId: profile.id,
+          auctionId: auction.auction.id,
+          productId: auction.id
+        });
+        toast({
+          title: "Error",
+          description: "Missing required information. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
 
       const { error: bidError } = await supabase
         .from('bids')
         .insert({
           product_id: auction.id,
+          auction_id: auction.auction.id,
           bidder_id: profile.id,
           bidder_name: profile.name,
           amount: amount,
-          status: 'pending'
+          created_at: new Date().toISOString()
         });
 
-      if (bidError) throw bidError;
+      if (bidError) {
+        console.error('Error placing bid:', bidError);
+        throw bidError;
+      }
+
+      // Update the auction's current price
+      const { error: updateError } = await supabase
+        .from('auctions')
+        .update({ current_price: amount })
+        .eq('id', auction.auction.id);
+
+      if (updateError) {
+        console.error('Error updating auction price:', updateError);
+        throw updateError;
+      }
 
       toast({
-        title: "Bid Placed",
-        description: "Your bid has been successfully placed.",
+        title: "Success",
+        description: "Your bid has been placed successfully!",
       });
 
-      // Refresh auctions to show updated bid
+      // Refresh auctions to show updated price
       fetchAuctions();
     } catch (error) {
-      console.error('Error placing bid:', error);
+      console.error('Error in placeBid:', error);
       toast({
         title: "Error",
         description: "Failed to place bid. Please try again.",

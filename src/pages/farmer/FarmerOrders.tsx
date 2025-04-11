@@ -136,16 +136,9 @@ export const FarmerOrders = () => {
                       )}
                       {order.status === 'processing' && (
                         <Button
-                          onClick={() => handleUpdateStatus(order.id, 'shipped')}
+                          onClick={() => handleUpdateStatus(order.id, 'completed')}
                         >
-                          Mark as Shipped
-                        </Button>
-                      )}
-                      {order.status === 'shipped' && (
-                        <Button
-                          onClick={() => handleUpdateStatus(order.id, 'delivered')}
-                        >
-                          Mark as Delivered
+                          Mark as Completed
                         </Button>
                       )}
                     </div>

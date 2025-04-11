@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -166,9 +165,9 @@ const Settings = () => {
       
       <Card>
         <CardHeader>
-          <CardTitle>Notification Preferences</CardTitle>
+          <CardTitle>Account Settings</CardTitle>
           <CardDescription>
-            Manage your notification preferences for email and push notifications.
+            Manage your account settings and preferences.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -178,37 +177,12 @@ const Settings = () => {
             </div>
           ) : (
             <>
-              <div className="grid gap-6">
+              <div className="space-y-6">
                 <div>
-                  <h4 className="mb-2 font-semibold">Email Notifications</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(settings.email).map(([key, value]) => (
-                      <div key={key} className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <Label htmlFor={`email-${key}`} className="capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
-                        <Switch
-                          id={`email-${key}`}
-                          checked={value}
-                          onCheckedChange={(checked) => handleSettingsChange('email', key, checked)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="mb-2 font-semibold">Push Notifications</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(settings.push).map(([key, value]) => (
-                      <div key={key} className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <Label htmlFor={`push-${key}`} className="capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
-                        <Switch
-                          id={`push-${key}`}
-                          checked={value}
-                          onCheckedChange={(checked) => handleSettingsChange('push', key, checked)}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                  <h3 className="text-lg font-medium">Account Settings</h3>
+                  <p className="text-sm text-gray-500">
+                    Manage your account settings and preferences.
+                  </p>
                 </div>
               </div>
 

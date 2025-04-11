@@ -44,7 +44,6 @@ const AuthProviderContent = ({
   const [initialized, setInitialized] = useState(false);
 
   const fetchProfile = async (userId: string) => {
-    console.log("Fetching profile for user:", userId);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -53,21 +52,16 @@ const AuthProviderContent = ({
         .single();
 
       if (error) {
-        console.error('Error fetching profile:', error);
         return null;
       }
 
-      console.log("Profile fetched successfully:", data);
       return data as Profile;
     } catch (error) {
-      console.error('Error fetching profile:', error);
       return null;
     }
   };
 
   const handleAuthStateChange = async (event: string, currentSession: Session | null) => {
-    console.log("Auth state changed:", event, "Session:", currentSession?.user?.email);
-    
     try {
       if (event === 'SIGNED_OUT' || !currentSession) {
         setSession(null);
@@ -92,7 +86,6 @@ const AuthProviderContent = ({
         }
       }
     } catch (error) {
-      console.error("Error in handleAuthStateChange:", error);
     }
   };
 
@@ -100,12 +93,10 @@ const AuthProviderContent = ({
     let mounted = true;
     
     const initializeAuth = async () => {
-      console.log("Initializing auth...");
       try {
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting initial session:', error);
           if (mounted) {
             setLoading(false);
             setInitialized(true);
@@ -115,7 +106,6 @@ const AuthProviderContent = ({
 
         if (mounted) {
           if (initialSession?.user) {
-            console.log("Initial session found:", initialSession.user.email);
             const profileData = await fetchProfile(initialSession.user.id);
             
             setSession(initialSession);
@@ -144,7 +134,6 @@ const AuthProviderContent = ({
           setLoading(false);
         }
       } catch (error) {
-        console.error('Error during auth initialization:', error);
         if (mounted) {
           setLoading(false);
           setInitialized(true);
@@ -157,14 +146,12 @@ const AuthProviderContent = ({
 
     // Set up auth state listener after initialization
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log("Auth state change event:", event);
       if (mounted && initialized) {
         await handleAuthStateChange(event, currentSession);
       }
     });
 
     return () => {
-      console.log("Cleaning up auth effect");
       mounted = false;
       subscription.unsubscribe();
     };
@@ -238,7 +225,6 @@ const AuthProviderContent = ({
       // Force a full page reload to clear all state
       window.location.href = '/auth';
     } catch (error) {
-      console.error('Error signing out:', error);
     } finally {
       setLoading(false);
     }
@@ -255,7 +241,6 @@ const AuthProviderContent = ({
 
   // Show loading spinner while initializing
   if (!initialized) {
-    console.log("Waiting for auth initialization...");
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>

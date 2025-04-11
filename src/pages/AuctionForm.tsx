@@ -407,25 +407,6 @@ const AuctionForm = () => {
                   
                   <Separator />
                   
-                  <div>
-                    <Label className="mb-2 block">Shipping Responsibility</Label>
-                    <Select 
-                      value={formData.shippingOptions} 
-                      onValueChange={(value) => handleSelectChange('shippingOptions', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select shipping option" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="seller">I'll arrange shipping (seller's responsibility)</SelectItem>
-                        <SelectItem value="buyer">Buyer arranges shipping (buyer's responsibility)</SelectItem>
-                        <SelectItem value="negotiable">Negotiable after auction</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <Separator />
-                  
                   <div className="flex items-center justify-between">
                     <Label htmlFor="allowAutoBids" className="cursor-pointer">
                       Allow Auto-Bidding

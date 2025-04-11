@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -26,13 +25,13 @@ import {
   LogOut, 
   Settings, 
   Menu, 
-  Truck, 
   Calendar, 
   PieChart, 
-  Bell, 
   Wallet,
   Users,
-  Mail
+  Mail,
+  LayoutDashboard,
+  MessageSquare
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -61,12 +60,7 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
     { title: "My Products", url: "/farmer-products", icon: Package },
     { title: "My Auctions", url: "/farmer-auctions", icon: Gavel },
     { title: "Orders", url: "/farmer-orders", icon: ShoppingCart },
-    { title: "Shipments", url: "/farmer-shipments", icon: Truck },
     { title: "Appointments", url: "/farmer-appointments", icon: Calendar },
-    { title: "Pricing", url: "/farmer-pricing", icon: Wallet },
-    { title: "Messages", url: "/farmer-messages", icon: Mail },
-    { title: "Notifications", url: "/farmer-notifications", icon: Bell },
-    { title: "Reports", url: "/farmer-reports", icon: BarChart3 },
     { title: "Profile", url: "/farmer-profile", icon: UserCircle },
   ];
 
@@ -76,11 +70,7 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
     { title: "Auctions", url: "/trader-auctions", icon: Gavel },
     { title: "My Bids", url: "/trader-bids", icon: PieChart },
     { title: "Orders", url: "/trader-orders", icon: ShoppingCart },
-    { title: "Shipments", url: "/trader-shipments", icon: Truck },
     { title: "Appointments", url: "/trader-appointments", icon: Calendar },
-    { title: "Messages", url: "/trader-messages", icon: Mail },
-    { title: "Notifications", url: "/trader-notifications", icon: Bell },
-    { title: "Reports", url: "/trader-reports", icon: BarChart3 },
     { title: "Profile", url: "/trader-profile", icon: UserCircle },
   ];
 

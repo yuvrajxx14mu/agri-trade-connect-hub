@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -59,7 +58,6 @@ const TraderOrders = () => {
           price,
           total_amount,
           farmer_id,
-          profiles(id, name),
           products(id, name, image_url)
         `)
         .eq('trader_id', profile.id)

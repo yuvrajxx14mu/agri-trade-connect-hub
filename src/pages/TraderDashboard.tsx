@@ -77,8 +77,6 @@ const TraderDashboard = () => {
         ? Math.round(((currentAuctionCount - previousAuctionCount) / previousAuctionCount) * 100)
         : 0;
 
-      console.log('Raw auctions data:', currentAuctions); // Debug log
-
       // If we get auctions, then try to fetch their product details
       let processedAuctions = [];
       if (currentAuctions && currentAuctions.length > 0) {
@@ -98,8 +96,6 @@ const TraderDashboard = () => {
           });
           throw productsError;
         }
-
-        console.log('Products for auctions:', products); // Debug log
 
         // Create a map of products for easy lookup
         const productsMap = (products || []).reduce((acc, product) => {
@@ -125,8 +121,6 @@ const TraderDashboard = () => {
           };
         });
       }
-
-      console.log('Processed auctions:', processedAuctions); // Debug log
 
       // Fetch current period orders
       const { data: currentOrders, error: ordersError } = await supabase
@@ -190,8 +184,6 @@ const TraderDashboard = () => {
         });
         throw productsError;
       }
-
-      console.log('Fetched products:', products); // Debug log
 
       // Calculate product category distribution
       const categoryCount = products?.reduce((acc, product) => {

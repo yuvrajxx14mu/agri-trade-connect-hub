@@ -93,10 +93,6 @@ const TraderOrderCreate = () => {
         throw new Error(`Quantity cannot exceed available stock (${product.quantity} ${product.unit})`);
       }
 
-      if (!shippingAddress.trim()) {
-        throw new Error("Please enter a shipping address");
-      }
-
       const totalAmount = quantityNum * product.price;
 
       // Check if product is still available
@@ -131,7 +127,6 @@ const TraderOrderCreate = () => {
         status: "pending",
         payment_status: "pending",
         notes: notes || null,
-        shipping_address: shippingAddress.trim(),
         delivery_date: null,
         payment_date: null
       };
@@ -144,28 +139,22 @@ const TraderOrderCreate = () => {
 
       if (error) throw error;
 
-      // Create notification for farmer
-      await supabase
-        .from("notifications")
-        .insert({
-          user_id: product.farmer_id,
-          title: "New Order Received",
-          message: `You have received a new order for ${product.name}`,
-          type: "order_created",
-          read: false
-        });
+      toast({
+        title: "Success",
+        description: "Order created successfully",
+        variant: "default"
+      });
 
       // Update product quantity
-      const newQuantity = product.quantity - quantityNum;
-      await supabase
+      const { error: updateError } = await supabase
         .from("products")
-        .update({ quantity: newQuantity })
+        .update({
+          quantity: currentProduct.quantity - quantityNum,
+          status: currentProduct.quantity - quantityNum <= 0 ? "sold" : "active"
+        })
         .eq("id", product.id);
 
-      toast({
-        title: "Order Created",
-        description: "Your order has been created successfully.",
-      });
+      if (updateError) throw updateError;
 
       navigate(`/trader-orders/${order.id}`);
     } catch (error: any) {
@@ -244,17 +233,6 @@ const TraderOrderCreate = () => {
                       {formatCurrency(product.price)}
                     </div>
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="shippingAddress">Shipping Address *</Label>
-                  <Textarea
-                    id="shippingAddress"
-                    value={shippingAddress}
-                    onChange={(e) => setShippingAddress(e.target.value)}
-                    placeholder="Enter your shipping address"
-                    required
-                  />
                 </div>
 
                 <div className="space-y-2">

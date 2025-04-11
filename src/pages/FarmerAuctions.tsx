@@ -117,6 +117,7 @@ const FarmerAuctions = () => {
       // Add farmer names to the auctions data
       const auctionsWithFarmers = auctionsData?.map(auction => ({
         ...auction,
+        products: auction.products || { name: "Unknown Product" },
         farmer_name: farmerMap[auction.farmer_id]?.name || 'Unknown Farmer'
       }));
 
@@ -251,7 +252,6 @@ const FarmerAuctions = () => {
               <DataTable
                 columns={columns}
                 data={auctions}
-                searchKey="products.name"
               />
             )}
           </CardContent>

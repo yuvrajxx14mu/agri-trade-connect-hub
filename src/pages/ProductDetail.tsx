@@ -204,12 +204,6 @@ const ProductDetail = () => {
           View Auction
         </Button>
       )}
-      {!isProductOwner && (
-        <Button variant="outline" onClick={() => navigate('/messages', { state: { userId: product.farmer_id } })}>
-          <MessageCircle className="mr-2 h-4 w-4" />
-          Contact Seller
-        </Button>
-      )}
     </div>
   );
   
@@ -367,55 +361,25 @@ const ProductDetail = () => {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Seller Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-4 mb-4">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={product.profiles?.avatar_url} />
-                  <AvatarFallback>
-                    {product.profiles?.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">{product.profiles?.name}</div>
-                  <div className="text-sm text-muted-foreground">{product.location}</div>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="text-sm font-medium">Contact Information</div>
-                {!isProductOwner && (
-                  <Button variant="outline" className="w-full" onClick={() => navigate('/messages', { state: { userId: product.farmer_id } })}>
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    Contact Seller
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Shipping Information</CardTitle>
+              <CardTitle>Product Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-start space-x-3">
-                <Truck className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <Package className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div>
-                  <div className="text-sm font-medium">Shipping Available</div>
+                  <div className="text-sm font-medium">Quantity Available</div>
                   <div className="text-sm text-muted-foreground">
-                    {product.shipping_availability || "Contact seller for shipping information."}
+                    {product.quantity} {product.unit}
                   </div>
                 </div>
               </div>
               
               <div className="flex items-start space-x-3">
-                <ClipboardList className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div>
-                  <div className="text-sm font-medium">Shipping Policy</div>
+                  <div className="text-sm font-medium">Location</div>
                   <div className="text-sm text-muted-foreground">
-                    {product.shipping_policy || "Contact seller for shipping policy details."}
+                    {product.location}
                   </div>
                 </div>
               </div>

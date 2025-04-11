@@ -1,24 +1,24 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
+import { supabase } from "../integrations/supabase/client";
+import { useAuth } from "../context/AuthContext";
+import DashboardLayout from "../components/dashboard/DashboardLayout";
+import DashboardHeader from "../components/dashboard/DashboardHeader";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { Progress } from "../components/ui/progress";
 import { Gavel, Calendar, MapPin, Package, Tag, Clock, ArrowLeft, ArrowBigUp, User, UserCheck } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Separator } from "../components/ui/separator";
+import { Label } from "../components/ui/label";
+import { useToast } from "../hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { formatCurrency } from "@/lib/utils";
-import BidHistory from "@/components/BidHistory";
+import { formatCurrency } from "../lib/utils";
+import BidHistory from "../components/BidHistory";
 
 interface Profile {
   id: string;
@@ -102,29 +102,28 @@ const AuctionPage = () => {
   // Function to fetch auction data
   const fetchAuction = async () => {
     try {
-      // First fetch the auction details with product data
+      // First fetch the auction details
       const { data: auctionData, error: auctionError } = await supabase
         .from('auctions')
-        .select(`
-          *,
-          product:products (
-            id,
-            name,
-            category,
-            description,
-            quantity,
-            unit,
-            price,
-            location,
-            image_url
-          )
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
       if (auctionError) throw auctionError;
 
       if (auctionData) {
+        // Then fetch the product separately
+        const { data: productData, error: productError } = await supabase
+          .from('products')
+          .select('id, name, category, description, quantity, unit, price, location, image_url')
+          .eq('id', auctionData.product_id)
+          .single();
+
+        if (productError) {
+          console.error('Error fetching product:', productError);
+          throw productError;
+        }
+
         // Then fetch the farmer profile separately
         let farmerProfile: Profile;
         const { data: farmerData, error: farmerError } = await supabase
@@ -165,7 +164,7 @@ const AuctionPage = () => {
           ...auctionData,
           farmer_profile: farmerProfile,
           bids: (bidsData || []) as Bid[],
-          product: auctionData.product
+          product: productData
         };
         
         setAuction(transformedAuction);
@@ -338,36 +337,6 @@ const AuctionPage = () => {
         .eq('id', auction.id);
 
       if (updateError) throw updateError;
-
-      // Create notification for farmer
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: auction.farmer_id,
-          title: "New Bid Received",
-          message: `A new bid of ${formatCurrency(bidValue)} has been placed on your auction`,
-          type: "bid",
-          metadata: {
-            auction_id: auction.id,
-            bid_amount: bidValue
-          }
-        });
-
-      // Create notification for outbid trader if exists
-      if (highestBid && highestBid.bidder_id !== profile.id) {
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: highestBid.bidder_id,
-            title: "You've Been Outbid",
-            message: `Your bid of ${formatCurrency(highestBid.amount)} has been outbid by ${formatCurrency(bidValue)}`,
-            type: "bid",
-            metadata: {
-              auction_id: auction.id,
-              bid_amount: bidValue
-            }
-          });
-      }
 
       toast({
         title: "Bid Placed",

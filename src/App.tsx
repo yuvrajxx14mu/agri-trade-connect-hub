@@ -18,32 +18,21 @@ import TraderOrderCreate from "./pages/TraderOrderCreate";
 // New Page imports
 import FarmerAuctions from "./pages/FarmerAuctions";
 import FarmerOrders from "./pages/FarmerOrders";
-import FarmerShipments from "./pages/FarmerShipments";
 import FarmerAppointments from "./pages/FarmerAppointments";
-import FarmerPricing from "./pages/FarmerPricing";
-import FarmerNotifications from "./pages/FarmerNotifications";
-import FarmerReports from "./pages/FarmerReports";
 import FarmerProfile from "./pages/FarmerProfile";
-import FarmerMessages from "./pages/FarmerMessages";
 
 import TraderMarket from "./pages/TraderMarket";
 import TraderAuctions from "./pages/TraderAuctions";
 import TraderBids from "./pages/TraderBids";
 import TraderOrders from "./pages/TraderOrders";
-import TraderShipments from "./pages/TraderShipments";
 import TraderAppointments from "./pages/TraderAppointments";
-import TraderNotifications from "./pages/TraderNotifications";
-import TraderReports from "./pages/TraderReports";
 import TraderProfile from "./pages/TraderProfile";
-import TraderMessages from "./pages/TraderMessages";
 
 import Settings from "./pages/Settings";
 import ProductDetail from "./pages/ProductDetail";
 import ProductForm from "./pages/ProductForm";
 import AuctionForm from "./pages/AuctionForm";
 import OrderDetail from "./pages/OrderDetail";
-import ShipmentDetail from "./pages/ShipmentDetail";
-import ShipmentForm from "./pages/ShipmentForm";
 import AppointmentForm from "./pages/AppointmentForm";
 
 const queryClient = new QueryClient();
@@ -113,26 +102,6 @@ const App = () => (
                 <OrderDetail />
               </ProtectedRoute>
             } />
-            <Route path="/farmer-shipments" element={
-              <ProtectedRoute requiredRole="farmer">
-                <FarmerShipments />
-              </ProtectedRoute>
-            } />
-            <Route path="/farmer-shipments/new" element={
-              <ProtectedRoute requiredRole="farmer">
-                <ShipmentForm />
-              </ProtectedRoute>
-            } />
-            <Route path="/farmer-shipments/new/:orderId" element={
-              <ProtectedRoute requiredRole="farmer">
-                <ShipmentForm />
-              </ProtectedRoute>
-            } />
-            <Route path="/farmer-shipments/:id" element={
-              <ProtectedRoute requiredRole="farmer">
-                <ShipmentDetail />
-              </ProtectedRoute>
-            } />
             <Route path="/farmer-appointments" element={
               <ProtectedRoute requiredRole="farmer">
                 <FarmerAppointments />
@@ -143,29 +112,9 @@ const App = () => (
                 <AppointmentForm />
               </ProtectedRoute>
             } />
-            <Route path="/farmer-pricing" element={
-              <ProtectedRoute requiredRole="farmer">
-                <FarmerPricing />
-              </ProtectedRoute>
-            } />
-            <Route path="/farmer-notifications" element={
-              <ProtectedRoute requiredRole="farmer">
-                <FarmerNotifications />
-              </ProtectedRoute>
-            } />
-            <Route path="/farmer-reports" element={
-              <ProtectedRoute requiredRole="farmer">
-                <FarmerReports />
-              </ProtectedRoute>
-            } />
             <Route path="/farmer-profile" element={
               <ProtectedRoute requiredRole="farmer">
                 <FarmerProfile />
-              </ProtectedRoute>
-            } />
-            <Route path="/farmer-messages" element={
-              <ProtectedRoute requiredRole="farmer">
-                <FarmerMessages />
               </ProtectedRoute>
             } />
             
@@ -215,39 +164,14 @@ const App = () => (
                 <OrderDetail />
               </ProtectedRoute>
             } />
-            <Route path="/trader-shipments" element={
-              <ProtectedRoute requiredRole="trader">
-                <TraderShipments />
-              </ProtectedRoute>
-            } />
-            <Route path="/trader-shipments/:id" element={
-              <ProtectedRoute requiredRole="trader">
-                <ShipmentDetail />
-              </ProtectedRoute>
-            } />
             <Route path="/trader-appointments" element={
               <ProtectedRoute requiredRole="trader">
                 <TraderAppointments />
               </ProtectedRoute>
             } />
-            <Route path="/trader-notifications" element={
-              <ProtectedRoute requiredRole="trader">
-                <TraderNotifications />
-              </ProtectedRoute>
-            } />
-            <Route path="/trader-reports" element={
-              <ProtectedRoute requiredRole="trader">
-                <TraderReports />
-              </ProtectedRoute>
-            } />
             <Route path="/trader-profile" element={
               <ProtectedRoute requiredRole="trader">
                 <TraderProfile />
-              </ProtectedRoute>
-            } />
-            <Route path="/trader-messages" element={
-              <ProtectedRoute requiredRole="trader">
-                <TraderMessages />
               </ProtectedRoute>
             } />
             
@@ -258,7 +182,6 @@ const App = () => (
               </ProtectedRoute>
             } />
             
-            {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
           </Routes>
           <Toaster />

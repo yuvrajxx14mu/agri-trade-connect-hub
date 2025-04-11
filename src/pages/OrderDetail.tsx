@@ -49,7 +49,6 @@ const OrderDetail = () => {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<any>(null);
-  const [shipment, setShipment] = useState<any>(null);
   const [otherParty, setOtherParty] = useState<any>(null);
   
   const userPath = location.pathname.includes('farmer') ? 'farmer' : 'trader';
@@ -114,15 +113,6 @@ const OrderDetail = () => {
           setOtherParty(completeOrderData.farmer);
         }
         
-        const { data: shipmentData, error: shipmentError } = await supabase
-          .from('shipments')
-          .select('*')
-          .eq('order_id', id)
-          .maybeSingle();
-        
-        if (shipmentError) throw shipmentError;
-        
-        setShipment(shipmentData);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching order details:', error);
@@ -399,11 +389,6 @@ const OrderDetail = () => {
                 )}
               </div>
             </CardContent>
-            <CardFooter>
-              <Button variant="outline" className="w-full" onClick={() => navigate('/messages', { state: { userId: otherParty?.id } })}>
-                Message
-              </Button>
-            </CardFooter>
           </Card>
         </div>
         
@@ -474,112 +459,6 @@ const OrderDetail = () => {
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Shipment Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {shipment ? (
-                <Tabs defaultValue="details" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="details">Details</TabsTrigger>
-                    <TabsTrigger value="tracking">Tracking</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="details">
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div>
-                        <p className="text-sm font-medium">Tracking Number</p>
-                        <p className="text-sm text-muted-foreground">{shipment.tracking_number}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Status</p>
-                        <Badge variant="outline">
-                          {shipment.status.replace('_', ' ').charAt(0).toUpperCase() + 
-                            shipment.status.replace('_', ' ').slice(1)}
-                        </Badge>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Dispatch Date</p>
-                        <p className="text-sm text-muted-foreground">
-                          {shipment.dispatch_date ? 
-                            new Date(shipment.dispatch_date).toLocaleDateString() : 
-                            'Pending'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Estimated Delivery</p>
-                        <p className="text-sm text-muted-foreground">
-                          {shipment.estimated_delivery ? 
-                            new Date(shipment.estimated_delivery).toLocaleDateString() : 
-                            'Pending'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Carrier</p>
-                        <p className="text-sm text-muted-foreground">{shipment.carrier}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Destination</p>
-                        <p className="text-sm text-muted-foreground">{shipment.destination}</p>
-                      </div>
-                      {shipment.notes && (
-                        <div className="col-span-2">
-                          <p className="text-sm font-medium">Notes</p>
-                          <p className="text-sm text-muted-foreground">{shipment.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="tracking">
-                    <div className="mt-4">
-                      <div className="relative">
-                        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-muted-foreground/20" />
-                        <div className="space-y-6 relative">
-                          {[
-                            { status: "Order Placed", date: new Date(order.created_at).toLocaleDateString(), completed: true },
-                            { status: "Processing", date: shipment.status === "processing" ? "Current" : (shipment.status === "packed" || shipment.status === "shipped" || shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" ? "Completed" : "Pending"), completed: shipment.status === "processing" || shipment.status === "packed" || shipment.status === "shipped" || shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" },
-                            { status: "Packed", date: shipment.status === "packed" ? "Current" : (shipment.status === "shipped" || shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" ? "Completed" : "Pending"), completed: shipment.status === "packed" || shipment.status === "shipped" || shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" },
-                            { status: "Shipped", date: shipment.status === "shipped" ? "Current" : (shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" ? "Completed" : "Pending"), completed: shipment.status === "shipped" || shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" },
-                            { status: "In Transit", date: shipment.status === "in_transit" ? "Current" : (shipment.status === "out_for_delivery" || shipment.status === "delivered" ? "Completed" : "Pending"), completed: shipment.status === "in_transit" || shipment.status === "out_for_delivery" || shipment.status === "delivered" },
-                            { status: "Out for Delivery", date: shipment.status === "out_for_delivery" ? "Current" : (shipment.status === "delivered" ? "Completed" : "Pending"), completed: shipment.status === "out_for_delivery" || shipment.status === "delivered" },
-                            { status: "Delivered", date: shipment.status === "delivered" ? shipment.actual_delivery ? new Date(shipment.actual_delivery).toLocaleDateString() : "Completed" : "Pending", completed: shipment.status === "delivered" }
-                          ].map((step, index) => (
-                            <div key={index} className="ml-9">
-                              <div className="flex items-center mb-1">
-                                <div className={`absolute -left-1 w-6 h-6 flex items-center justify-center rounded-full ${step.completed ? "bg-primary" : "bg-muted"}`}>
-                                  {step.completed && (
-                                    <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
-                                  )}
-                                </div>
-                                <h4 className={`text-sm font-medium ${step.completed ? "text-foreground" : "text-muted-foreground"}`}>
-                                  {step.status}
-                                </h4>
-                              </div>
-                              <p className="text-xs text-muted-foreground">{step.date}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8">
-                  <Truck className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Shipment Created Yet</h3>
-                  <p className="text-sm text-muted-foreground text-center mb-4">
-                    Shipping information will appear here once available.
-                  </p>
-                  {userRole === 'farmer' && order.status === 'processing' && (
-                    <Button onClick={() => navigate(`/farmer-shipments/create?orderId=${id}`)}>
-                      Create Shipment
-                    </Button>
-                  )}
-                </div>
-              )}
             </CardContent>
           </Card>
           
