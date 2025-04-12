@@ -33,8 +33,14 @@ export const generateInvoicePDF = (data: InvoiceData): Blob => {
   const tableData = data.items.map(item => [
     item.name,
     item.quantity.toString(),
-    `₹${item.price.toLocaleString()}`,
-    `₹${item.total.toLocaleString()}`
+    `₹ ${item.price.toLocaleString('en-IN', {
+      maximumFractionDigits: 0,
+      useGrouping: true
+    })}`,
+    `₹ ${item.total.toLocaleString('en-IN', {
+      maximumFractionDigits: 0,
+      useGrouping: true
+    })}`
   ]);
 
   (doc as any).autoTable({
@@ -47,15 +53,18 @@ export const generateInvoicePDF = (data: InvoiceData): Blob => {
     columnStyles: {
       0: { cellWidth: 80 },
       1: { cellWidth: 30 },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 30 }
+      2: { cellWidth: 40 },
+      3: { cellWidth: 40 }
     }
   });
 
   // Add total
   const finalY = (doc as any).lastAutoTable.finalY || 100;
   doc.setFontSize(12);
-  doc.text(`Total Amount: ₹${data.total.toLocaleString()}`, 20, finalY + 20);
+  doc.text(`Total Amount: ₹ ${data.total.toLocaleString('en-IN', {
+    maximumFractionDigits: 0,
+    useGrouping: true
+  })}`, 20, finalY + 20);
 
   // Add footer
   doc.setFontSize(10);

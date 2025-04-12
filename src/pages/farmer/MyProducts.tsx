@@ -104,7 +104,7 @@ const MyProducts = () => {
           userRole="farmer"
         />
         <div className="flex justify-end mb-4">
-          <Button onClick={() => navigate("/farmer-products/create")}>
+          <Button onClick={() => navigate("/farmer-products/add")}>
             <Package className="mr-2 h-4 w-4" />
             Add New Product
           </Button>
@@ -175,7 +175,7 @@ const MyProducts = () => {
                     <div className="flex flex-col items-center gap-2">
                       <Package className="h-8 w-8 text-muted-foreground" />
                       <p className="text-muted-foreground">No products found</p>
-                      <Button variant="outline" onClick={() => navigate("/farmer-products/create")}>
+                      <Button variant="outline" onClick={() => navigate("/farmer-products/add")}>
                         Add Your First Product
                       </Button>
                     </div>

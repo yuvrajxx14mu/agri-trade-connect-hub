@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Settings, LogOut, User, UserCircle } from "lucide-react";
+import { UserCircle } from "lucide-react";
 
 interface UserMenuProps {
   userName: string;
@@ -19,7 +18,6 @@ interface UserMenuProps {
 
 const UserMenu = ({ userName, userRole }: UserMenuProps) => {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
   
   const getInitials = (name: string) => {
     return name
@@ -28,11 +26,6 @@ const UserMenu = ({ userName, userRole }: UserMenuProps) => {
       .join('')
       .toUpperCase()
       .substring(0, 2);
-  };
-  
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
   };
   
   const profilePath = userRole === "farmer" ? "/farmer-profile" : "/trader-profile";
@@ -53,15 +46,6 @@ const UserMenu = ({ userName, userRole }: UserMenuProps) => {
         <DropdownMenuItem onClick={() => navigate(profilePath)}>
           <UserCircle className="mr-2 h-4 w-4" />
           <span>Profile</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate(`${profilePath}/settings`)}>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Settings</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut}>
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

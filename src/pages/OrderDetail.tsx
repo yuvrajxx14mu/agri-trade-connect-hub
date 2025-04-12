@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
+import { downloadInvoice } from "@/services/pdfService";
+import { format } from "date-fns";
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -213,12 +215,46 @@ const OrderDetail = () => {
     }
   };
 
-  const handleDownloadInvoice = () => {
-    toast({
-      title: "Feature Coming Soon",
-      description: "The invoice download functionality will be available soon",
-      variant: "default"
-    });
+  const handleDownloadInvoice = async () => {
+    if (!id || !profile?.id) return;
+    
+    try {
+      const { data: orderData, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          products:product_id(name, description),
+          profiles:farmer_id(name),
+          trader:trader_id(name)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+
+      const invoiceData = {
+        orderId: orderData.id,
+        date: format(new Date(orderData.created_at), 'dd/MM/yyyy'),
+        farmerName: orderData.profiles.name,
+        traderName: orderData.trader.name,
+        items: [{
+          name: orderData.products.name,
+          quantity: orderData.quantity,
+          price: orderData.price,
+          total: orderData.total_amount
+        }],
+        total: orderData.total_amount
+      };
+
+      downloadInvoice(invoiceData, `invoice-${orderData.id}.pdf`);
+    } catch (error) {
+      console.error('Error generating invoice:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate invoice",
+        variant: "destructive"
+      });
+    }
   };
 
   if (loading) {

@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { BusinessDetails, CompanyFormData, ProfileFormData } from '../types/trader';
 import { Appointment, CreateAppointmentDto } from '../types/appointment';
 import { Bid, CreateBidDto } from '../types/bid';

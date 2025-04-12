@@ -63,7 +63,6 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
     { title: "My Auctions", url: "/farmer-auctions", icon: Gavel },
     { title: "Orders", url: "/farmer-orders", icon: ShoppingCart },
     { title: "Appointments", url: "/farmer-appointments", icon: Calendar },
-    { title: "Profile", url: "/farmer-profile", icon: UserCircle },
   ];
 
   const traderMenuItems = [
@@ -73,7 +72,6 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
     { title: "My Bids", url: "/trader-bids", icon: PieChart },
     { title: "Orders", url: "/trader-orders", icon: ShoppingCart },
     { title: "Appointments", url: "/trader-appointments", icon: Calendar },
-    { title: "Profile", url: "/trader-profile", icon: UserCircle },
   ];
 
   const menuItems = userRole === "farmer" ? farmerMenuItems : traderMenuItems;
@@ -137,21 +135,6 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
           <SidebarGroup className="mt-auto">
             <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    onClick={() => {
-                      navigate("/settings");
-                      if (isMobile) {
-                        setOpenMobile(false);
-                      }
-                    }}
-                  >
-                    <span className="flex items-center gap-2">
-                      <Settings className="h-5 w-5" />
-                      <span>Settings</span>
-                    </span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton 
                     onClick={() => {

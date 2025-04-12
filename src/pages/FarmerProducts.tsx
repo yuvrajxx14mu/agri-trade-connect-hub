@@ -124,6 +124,10 @@ const FarmerProducts = () => {
     }
   };
 
+  const handleCreateAuction = (productId: string) => {
+    navigate(`/farmer-auctions/create?product=${productId}`);
+  };
+
   const filteredProducts = products.filter(product => {
     const matchesSearch = 
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -244,14 +248,31 @@ const FarmerProducts = () => {
                       {formatCurrency(product.price || 0)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end items-center space-x-2">
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => navigate(`/farmer-products/${product.id}`)}
                           className="h-8 w-8 text-slate-600 hover:text-slate-900"
                         >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => navigate(`/farmer-products/${product.id}/edit`)}
+                          className="h-8 w-8 text-slate-600 hover:text-slate-900"
+                        >
                           <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleCreateAuction(product.id)}
+                          className="h-8 w-8 text-emerald-600 hover:text-emerald-900 hover:bg-emerald-100"
+                          title="Create Auction"
+                        >
+                          <Gavel className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"

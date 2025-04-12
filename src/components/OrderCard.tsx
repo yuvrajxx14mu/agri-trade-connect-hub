@@ -1,8 +1,9 @@
-
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 
 export interface OrderCardProps {
   id: string;
@@ -21,6 +22,7 @@ export interface OrderCardProps {
   status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "completed";
   paymentStatus: string;
   onClick?: () => void;
+  onGenerateInvoice?: () => void;
 }
 
 const OrderCard = ({
@@ -32,6 +34,7 @@ const OrderCard = ({
   status,
   paymentStatus,
   onClick,
+  onGenerateInvoice,
 }: OrderCardProps) => {
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -83,6 +86,19 @@ const OrderCard = ({
               <Badge variant="outline" className={`text-xxs sm:text-xs ${getPaymentStatusColor(paymentStatus)}`}>
                 {paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}
               </Badge>
+              {onGenerateInvoice && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onGenerateInvoice();
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Generate Invoice
+                </Button>
+              )}
             </div>
           </div>
         </div>

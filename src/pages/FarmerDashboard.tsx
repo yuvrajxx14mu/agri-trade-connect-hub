@@ -262,10 +262,6 @@ const FarmerDashboard = () => {
                 <CardTitle className="text-xl font-bold">Product Performance</CardTitle>
                 <CardDescription>How your products are doing</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/farmer/products')}>
-                <Package className="h-4 w-4 mr-1" />
-                View All
-              </Button>
             </div>
           </CardHeader>
           <CardContent>

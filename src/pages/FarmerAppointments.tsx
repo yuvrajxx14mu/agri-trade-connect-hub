@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { format, addDays, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +17,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Search, Calendar as CalendarIcon, Plus, Clock, X } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+const timeSlots = [
+  "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
+  "12:00 PM", "12:30 PM", "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM",
+  "03:00 PM", "03:30 PM", "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM"
+];
 
 interface Appointment {
   id: string;
@@ -142,17 +148,6 @@ const FarmerAppointments = () => {
       if (data) {
         setAppointments(prev => [...prev, data[0]]);
         
-        // Create notification for trader
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: newAppointment.traderId,
-            title: "New Appointment Request",
-            message: `${profile.name} has requested an appointment: ${newAppointment.title}`,
-            type: "appointment",
-            read: false
-          });
-        
         toast({
           title: "Success",
           description: "Appointment created successfully",
@@ -241,13 +236,24 @@ const FarmerAppointments = () => {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="time">Time</Label>
-                      <Input
-                        id="time"
-                        placeholder="e.g., 10:00 AM"
+                      <Label htmlFor="appointment_time">Time</Label>
+                      <Select
                         value={newAppointment.time}
-                        onChange={(e) => setNewAppointment(prev => ({ ...prev, time: e.target.value }))}
-                      />
+                        onValueChange={(value) => setNewAppointment(prev => ({ ...prev, time: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select time slot" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <ScrollArea className="h-60">
+                            {timeSlots.map(time => (
+                              <SelectItem key={time} value={time}>
+                                {time}
+                              </SelectItem>
+                            ))}
+                          </ScrollArea>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   <div className="grid gap-2">

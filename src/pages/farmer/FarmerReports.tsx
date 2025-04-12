@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Card,
   CardContent,
@@ -55,11 +55,7 @@ export default function FarmerReports() {
     try {
       const { data: orders, error } = await supabase
         .from('orders')
-        .select(`
-          *,
-          products:product_id(name, price),
-          trader:trader_id(profiles:user_id(name))
-        `)
+        .select('*')
         .eq('farmer_id', user.id)
         .gte('created_at', dateRange.from.toISOString())
         .lte('created_at', dateRange.to.toISOString())
@@ -67,26 +63,48 @@ export default function FarmerReports() {
 
       if (error) throw error;
 
+      // Get product names
+      const productIds = [...new Set(orders.map(order => order.product_id))];
+      const { data: products, error: productError } = await supabase
+        .from('products')
+        .select('id, name, price')
+        .in('id', productIds);
+
+      if (productError) throw productError;
+      const productMap = new Map(products.map(product => [product.id, product]));
+
+      // Get trader names
+      const traderIds = [...new Set(orders.map(order => order.trader_id))];
+      const { data: traders, error: traderError } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .in('id', traderIds);
+
+      if (traderError) throw traderError;
+      const traderMap = new Map(traders.map(trader => [trader.id, trader.name]));
+
       const totalSales = orders.reduce((sum, order) => sum + order.total_amount, 0);
       const totalOrders = orders.length;
       const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
       // Calculate top products
-      const productMap = new Map();
+      const productRevenueMap = new Map();
       orders.forEach(order => {
-        const product = order.products;
-        if (!productMap.has(product.name)) {
-          productMap.set(product.name, {
+        const product = productMap.get(order.product_id);
+        if (!product) return;
+        
+        if (!productRevenueMap.has(product.name)) {
+          productRevenueMap.set(product.name, {
             quantity: 0,
             revenue: 0
           });
         }
-        const current = productMap.get(product.name);
+        const current = productRevenueMap.get(product.name);
         current.quantity += order.quantity;
         current.revenue += order.total_amount;
       });
 
-      const topProducts = Array.from(productMap.entries())
+      const topProducts = Array.from(productRevenueMap.entries())
         .map(([name, data]) => ({
           name,
           ...data
@@ -95,14 +113,17 @@ export default function FarmerReports() {
         .slice(0, 5);
 
       // Format recent orders
-      const recentOrders = orders.slice(0, 5).map(order => ({
-        id: order.id,
-        productName: order.products.name,
-        quantity: order.quantity,
-        totalAmount: order.total_amount,
-        traderName: order.trader.profiles.name,
-        date: format(new Date(order.created_at), 'dd/MM/yyyy')
-      }));
+      const recentOrders = orders.slice(0, 5).map(order => {
+        const product = productMap.get(order.product_id);
+        return {
+          id: order.id,
+          productName: product?.name || 'Unknown Product',
+          quantity: order.quantity,
+          totalAmount: order.total_amount,
+          traderName: traderMap.get(order.trader_id) || 'Unknown Trader',
+          date: format(new Date(order.created_at), 'dd/MM/yyyy')
+        };
+      });
 
       setReportData({
         totalSales,
@@ -120,23 +141,34 @@ export default function FarmerReports() {
 
   const handleGenerateInvoice = async (orderId: string) => {
     try {
+      // First get the order and product info
       const { data: order, error } = await supabase
         .from('orders')
         .select(`
           *,
-          products:product_id(name, description),
-          trader:trader_id(profiles:user_id(name, email))
+          products:product_id(name, description)
         `)
         .eq('id', orderId)
         .single();
 
       if (error) throw error;
 
+      // Then get the trader info from profiles
+      const { data: traderProfile, error: traderError } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', order.trader_id)
+        .single();
+
+      if (traderError) {
+        console.error('Error fetching trader info:', traderError);
+      }
+
       const invoiceData = {
         orderId: order.id,
         date: format(new Date(order.created_at), 'dd/MM/yyyy'),
         farmerName: user?.user_metadata?.name || 'Farmer',
-        traderName: order.trader.profiles.name,
+        traderName: traderProfile?.name || 'Trader',
         items: [{
           name: order.products.name,
           quantity: order.quantity,

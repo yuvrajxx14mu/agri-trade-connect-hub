@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,23 +15,57 @@ import { Badge } from "@/components/ui/badge";
 import { Tractor, User, MapPin, Phone, Mail, Building, Crop, Droplets, Ruler, Loader2, FileCheck, Upload, Save } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
+interface PersonalDetails {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  address: string;
+}
+
+interface FarmDetails {
+  farmName: string;
+  farmType: string;
+  farmSize: string;
+  farmSizeUnit: string;
+  farmAddress: string;
+  soilType: string;
+  irrigationType: string;
+}
+
+interface BusinessDetails {
+  businessName: string;
+  businessType: string;
+  registrationNumber: string;
+  gstNumber: string;
+  businessAddress: string;
+  businessPhone: string;
+  businessEmail: string;
+  businessWebsite: string;
+}
+
 const FarmerProfile = () => {
   const { profile, updateProfile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [farmDetails, setFarmDetails] = useState({
+  const [personalDetails, setPersonalDetails] = useState<PersonalDetails>({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
+    address: ""
+  });
+  const [farmDetails, setFarmDetails] = useState<FarmDetails>({
     farmName: "",
     farmType: "",
     farmSize: "",
     farmSizeUnit: "acres",
     farmAddress: "",
-    farmPhone: "",
-    farmEmail: "",
     soilType: "",
     irrigationType: ""
   });
-  const [businessDetails, setBusinessDetails] = useState({
+  const [businessDetails, setBusinessDetails] = useState<BusinessDetails>({
     businessName: "",
     businessType: "",
     registrationNumber: "",
@@ -49,6 +82,13 @@ const FarmerProfile = () => {
       fetchFarmDetails();
       fetchBusinessDetails();
       fetchDocuments();
+      setPersonalDetails({
+        firstName: profile.name?.split(' ')[0] || '',
+        lastName: profile.name?.split(' ')[1] || '',
+        phone: profile.phone || '',
+        email: profile.email || '',
+        address: profile.address || ''
+      });
       setLoading(false);
     }
   }, [profile?.id]);
@@ -72,8 +112,6 @@ const FarmerProfile = () => {
           farmSize: data.farm_size?.toString() || "",
           farmSizeUnit: data.farm_size_unit || "acres",
           farmAddress: data.farm_address || "",
-          farmPhone: data.farm_phone || "",
-          farmEmail: data.farm_email || "",
           soilType: data.soil_type || "",
           irrigationType: data.irrigation_type || ""
         });
@@ -154,6 +192,55 @@ const FarmerProfile = () => {
     }));
   };
   
+  const handlePersonalDetailsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { id, value } = e.target;
+    setPersonalDetails(prev => ({
+      ...prev,
+      [id]: value
+    }));
+  };
+  
+  const handleSavePersonalDetails = async () => {
+    setSaving(true);
+    try {
+      const fullName = `${personalDetails.firstName} ${personalDetails.lastName}`.trim();
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: fullName,
+          phone: personalDetails.phone,
+          email: personalDetails.email,
+          address: personalDetails.address
+        })
+        .eq('id', profile.id);
+      
+      if (error) throw error;
+      
+      await updateProfile({
+        ...profile,
+        name: fullName,
+        phone: personalDetails.phone,
+        email: personalDetails.email,
+        address: personalDetails.address
+      });
+      
+      toast({
+        title: "Success",
+        description: "Personal details updated successfully."
+      });
+    } catch (error) {
+      console.error('Error saving personal details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save personal details.",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+  
   const handleSaveFarmDetails = async () => {
     setSaving(true);
     
@@ -170,8 +257,6 @@ const FarmerProfile = () => {
         farm_size: farmSize,
         farm_size_unit: farmDetails.farmSizeUnit,
         farm_address: farmDetails.farmAddress,
-        farm_phone: farmDetails.farmPhone,
-        farm_email: farmDetails.farmEmail,
         soil_type: farmDetails.soilType,
         irrigation_type: farmDetails.irrigationType
       };
@@ -313,12 +398,95 @@ const FarmerProfile = () => {
     <DashboardLayout userRole="farmer">
       <DashboardHeader title="My Profile" userName={profile?.name || "Farmer"} userRole="farmer" />
       
-      <Tabs defaultValue="farm" className="space-y-6">
+      <Tabs defaultValue="personal" className="space-y-6">
         <TabsList className="w-full md:w-auto grid grid-cols-3 md:inline-flex mb-6">
+          <TabsTrigger value="personal">Personal Details</TabsTrigger>
           <TabsTrigger value="farm">Farm Details</TabsTrigger>
           <TabsTrigger value="business">Business Details</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
+        
+        <TabsContent value="personal">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Personal Details
+              </CardTitle>
+              <CardDescription>
+                Provide your personal information
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={personalDetails.firstName}
+                    onChange={handlePersonalDetailsChange}
+                    placeholder="Enter your first name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={personalDetails.lastName}
+                    onChange={handlePersonalDetailsChange}
+                    placeholder="Enter your last name"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={personalDetails.phone}
+                    onChange={handlePersonalDetailsChange}
+                    placeholder="Enter your phone number"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={personalDetails.email}
+                    disabled
+                    placeholder="Enter your email"
+                  />
+                  <p className="text-xs text-muted-foreground">Contact support to change email</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <Textarea
+                  id="address"
+                  value={personalDetails.address}
+                  onChange={handlePersonalDetailsChange}
+                  placeholder="Enter your address"
+                  rows={3}
+                />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={handleSavePersonalDetails} disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Personal Details
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
         
         <TabsContent value="farm">
           <Card>
@@ -445,35 +613,6 @@ const FarmerProfile = () => {
                   placeholder="Enter complete farm address"
                   rows={3}
                 />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="farmPhone" className="flex items-center gap-1">
-                    <Phone className="h-4 w-4" />
-                    Farm Contact Number
-                  </Label>
-                  <Input
-                    id="farmPhone"
-                    value={farmDetails.farmPhone}
-                    onChange={handleFarmDetailsChange}
-                    placeholder="Enter farm contact number"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="farmEmail" className="flex items-center gap-1">
-                    <Mail className="h-4 w-4" />
-                    Farm Email
-                  </Label>
-                  <Input
-                    id="farmEmail"
-                    type="email"
-                    value={farmDetails.farmEmail}
-                    onChange={handleFarmDetailsChange}
-                    placeholder="Enter farm email address"
-                  />
-                </div>
               </div>
             </CardContent>
             <CardFooter>
@@ -618,93 +757,6 @@ const FarmerProfile = () => {
                 )}
               </Button>
             </CardFooter>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="documents">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileCheck className="h-5 w-5" />
-                Documents & Verification
-              </CardTitle>
-              <CardDescription>
-                Upload important documents for verification and compliance
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-md p-8">
-                <Upload className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Upload Documents</h3>
-                <p className="text-muted-foreground text-center max-w-md mb-4">
-                  Upload documents such as ID proof, address proof, or farm certifications
-                </p>
-                <div className="relative">
-                  <input
-                    type="file"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    onChange={handleUploadDocument}
-                  />
-                  <Button>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Select File
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Uploaded Documents</h3>
-                {documents.length > 0 ? (
-                  <div className="border rounded-md overflow-hidden">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-muted/50">
-                          <th className="text-left p-3">Document Name</th>
-                          <th className="text-left p-3">Type</th>
-                          <th className="text-left p-3">Status</th>
-                          <th className="text-left p-3">Uploaded On</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {documents.map((doc) => (
-                          <tr key={doc.id} className="border-t">
-                            <td className="p-3">
-                              <a 
-                                href={doc.file_url} 
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline"
-                              >
-                                {doc.title}
-                              </a>
-                            </td>
-                            <td className="p-3">{doc.document_type}</td>
-                            <td className="p-3">
-                              <Badge
-                                variant={
-                                  doc.status === 'verified' ? 'default' :
-                                  doc.status === 'pending' ? 'outline' :
-                                  'destructive'
-                                }
-                              >
-                                {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
-                              </Badge>
-                            </td>
-                            <td className="p-3">
-                              {new Date(doc.created_at).toLocaleDateString()}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center p-6 border rounded-md text-muted-foreground">
-                    No documents uploaded yet
-                  </div>
-                )}
-              </div>
-            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>

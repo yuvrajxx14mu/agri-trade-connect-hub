@@ -10,6 +10,26 @@ import { Search, ShoppingCart } from "lucide-react";
 import OrderCard from "@/components/OrderCard";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { downloadInvoice } from "@/services/pdfService";
+import { toast } from "@/components/ui/use-toast";
+
+interface Order {
+  id: string;
+  created_at: string;
+  quantity: number;
+  price: number;
+  total_amount: number;
+  products: {
+    name: string;
+  };
+  trader: {
+    name: string;
+  };
+  farmer: {
+    name: string;
+  };
+}
 
 const FarmerOrders = () => {
   const navigate = useNavigate();
@@ -100,6 +120,67 @@ const FarmerOrders = () => {
     };
   };
   
+  const handleGenerateInvoice = async (orderId: string) => {
+    try {
+      // First get the order details
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+      if (orderError) throw orderError;
+
+      if (!order) {
+        throw new Error('Order not found');
+      }
+
+      // Get trader details
+      const { data: traderData } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', order.trader_id)
+        .single();
+
+      // Get product details
+      const { data: productData } = await supabase
+        .from('products')
+        .select('name')
+        .eq('id', order.product_id)
+        .single();
+
+      // Get farmer details
+      const { data: farmerData } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', order.farmer_id)
+        .single();
+
+      const invoiceData = {
+        orderId: order.id,
+        date: new Date(order.created_at).toLocaleDateString(),
+        farmerName: farmerData?.name || 'Farmer',
+        traderName: traderData?.name || 'Trader',
+        items: [{
+          name: productData?.name || 'Product',
+          quantity: order.quantity,
+          price: order.price,
+          total: order.total_amount
+        }],
+        total: order.total_amount
+      };
+
+      await downloadInvoice(invoiceData, `invoice-${order.id}.pdf`);
+    } catch (error) {
+      console.error('Error generating invoice:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate invoice",
+        variant: "destructive"
+      });
+    }
+  };
+  
   return (
     <DashboardLayout userRole="farmer">
       <DashboardHeader 
@@ -146,6 +227,7 @@ const FarmerOrders = () => {
                     key={order.id}
                     {...formatOrderData(order)}
                     onClick={() => navigate(`/farmer-orders/${order.id}`)}
+                    onGenerateInvoice={() => handleGenerateInvoice(order.id)}
                   />
                 ))}
               </div>

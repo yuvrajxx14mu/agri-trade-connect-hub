@@ -14,6 +14,13 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 import { CalendarClock, Loader2, MapPin } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+const timeSlots = [
+  "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
+  "12:00 PM", "12:30 PM", "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM",
+  "03:00 PM", "03:30 PM", "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM"
+];
 
 const AppointmentForm = () => {
   const navigate = useNavigate();
@@ -118,18 +125,6 @@ const AppointmentForm = () => {
     }
   };
   
-  // Generate time options every 30 minutes
-  const timeOptions = [];
-  for (let hour = 9; hour <= 18; hour++) {
-    for (let minute of ['00', '30']) {
-      if (hour === 18 && minute === '30') continue; // Don't include 18:30
-      
-      const hourDisplay = hour > 12 ? hour - 12 : hour;
-      const ampm = hour >= 12 ? 'PM' : 'AM';
-      timeOptions.push(`${hourDisplay}:${minute} ${ampm}`);
-    }
-  }
-  
   return (
     <DashboardLayout userRole="farmer">
       <DashboardHeader 
@@ -205,14 +200,16 @@ const AppointmentForm = () => {
                   onValueChange={setTime}
                 >
                   <SelectTrigger id="time">
-                    <SelectValue placeholder="Select a time" />
+                    <SelectValue placeholder="Select time slot" />
                   </SelectTrigger>
                   <SelectContent>
-                    {timeOptions.map((time) => (
-                      <SelectItem key={time} value={time}>
-                        {time}
-                      </SelectItem>
-                    ))}
+                    <ScrollArea className="h-60">
+                      {timeSlots.map(time => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))}
+                    </ScrollArea>
                   </SelectContent>
                 </Select>
               </div>

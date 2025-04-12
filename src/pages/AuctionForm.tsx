@@ -18,6 +18,19 @@ import { format, addDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { formatCurrency } from "@/lib/utils";
+
+interface Product {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  status: string;
+  price: number;
+  location: string;
+  description?: string;
+}
 
 const AuctionForm = () => {
   const { id } = useParams();
@@ -28,6 +41,7 @@ const AuctionForm = () => {
   const { profile } = useAuth();
   const isEditMode = !!id;
   const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -47,10 +61,39 @@ const AuctionForm = () => {
     termsAccepted: false
   });
 
-  // Fetch product details when component mounts
+  // Fetch farmer's products when component mounts
+  useEffect(() => {
+    const fetchProducts = async () => {
+      if (!profile?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('farmer_id', profile.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        setProducts(data || []);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load products. Please try again.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    fetchProducts();
+  }, [profile?.id, toast]);
+
+  // Fetch product details when productId changes
   useEffect(() => {
     const fetchProductDetails = async () => {
-      if (!productId) {
+      if (!formData.productId) {
         setLoading(false);
         return;
       }
@@ -59,7 +102,7 @@ const AuctionForm = () => {
         const { data: product, error } = await supabase
           .from('products')
           .select('*')
-          .eq('id', productId)
+          .eq('id', formData.productId)
           .single();
 
         if (error) throw error;
@@ -85,7 +128,21 @@ const AuctionForm = () => {
     };
 
     fetchProductDetails();
-  }, [productId, toast]);
+  }, [formData.productId, toast]);
+
+  const handleProductSelect = (productId: string) => {
+    const selectedProduct = products.find(p => p.id === productId);
+    if (selectedProduct) {
+      setFormData(prev => ({
+        ...prev,
+        productId: selectedProduct.id,
+        productName: selectedProduct.name,
+        startingPrice: selectedProduct.price.toString(),
+        quantity: selectedProduct.quantity.toString(),
+        description: `Auction for ${selectedProduct.name} - ${selectedProduct.description || 'No description available'}`
+      }));
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -238,7 +295,26 @@ const AuctionForm = () => {
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 gap-4">
                     <div>
-                      <Label htmlFor="productName">Product</Label>
+                      <Label htmlFor="productId">Select Product</Label>
+                      <Select 
+                        value={formData.productId} 
+                        onValueChange={handleProductSelect}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a product" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name} - {product.quantity} {product.unit} ({formatCurrency(product.price)})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="productName">Product Name</Label>
                       <Input 
                         id="productName" 
                         name="productName" 
