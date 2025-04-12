@@ -11,6 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -44,6 +45,7 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
   const navigate = useNavigate();
   const [activeItem, setActiveItem] = useState("");
   const { profile, signOut } = useAuth();
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
 
   useEffect(() => {
     const path = location.pathname;
@@ -81,13 +83,19 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
   return (
     <>
       <div className="md:hidden fixed top-4 left-4 z-50">
-        <SidebarTrigger>
-          <Button variant="outline" size="icon">
-            <Menu className="h-5 w-5" />
-          </Button>
-        </SidebarTrigger>
+        <Button 
+          variant="outline" 
+          size="icon"
+          onClick={() => setOpenMobile(!openMobile)}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
       </div>
-      <Sidebar className={roleClass} variant="sidebar" collapsible="none">
+      <Sidebar 
+        className={roleClass} 
+        variant="sidebar" 
+        collapsible="offcanvas"
+      >
         <SidebarHeader className="flex p-4 items-center justify-between border-b">
           <div className="flex items-center gap-2">
             <div className="bg-primary p-1 rounded">
@@ -111,6 +119,9 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
                       onClick={() => {
                         navigate(item.url);
                         setActiveItem(item.url);
+                        if (isMobile) {
+                          setOpenMobile(false);
+                        }
                       }}
                     >
                       <span className="flex items-center gap-2">
@@ -127,7 +138,14 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton onClick={() => navigate("/settings")}>
+                  <SidebarMenuButton 
+                    onClick={() => {
+                      navigate("/settings");
+                      if (isMobile) {
+                        setOpenMobile(false);
+                      }
+                    }}
+                  >
                     <span className="flex items-center gap-2">
                       <Settings className="h-5 w-5" />
                       <span>Settings</span>
@@ -135,7 +153,14 @@ const DashboardSidebar = ({ userRole }: SidebarProps) => {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton onClick={handleSignOut}>
+                  <SidebarMenuButton 
+                    onClick={() => {
+                      handleSignOut();
+                      if (isMobile) {
+                        setOpenMobile(false);
+                      }
+                    }}
+                  >
                     <span className="flex items-center gap-2">
                       <LogOut className="h-5 w-5" />
                       <span>Log out</span>
