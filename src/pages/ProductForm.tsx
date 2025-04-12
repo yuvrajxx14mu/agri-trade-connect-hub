@@ -138,7 +138,10 @@ const ProductForm = () => {
           .eq('id', id)
           .eq('farmer_id', profile.id);
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating product:', error);
+          throw error;
+        }
         
         toast({
           title: "Product Updated",
@@ -148,9 +151,16 @@ const ProductForm = () => {
         // Create new product
         const { error } = await supabase
           .from('products')
-          .insert([productData]);
+          .insert([{
+            ...productData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }]);
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error creating product:', error);
+          throw error;
+        }
         
         toast({
           title: "Product Created",
@@ -159,11 +169,11 @@ const ProductForm = () => {
       }
       
       navigate("/farmer-products");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving product:', error);
       toast({
         title: "Error",
-        description: `Failed to ${isEditMode ? "update" : "create"} product`,
+        description: error.message || `Failed to ${isEditMode ? "update" : "create"} product`,
         variant: "destructive"
       });
     } finally {

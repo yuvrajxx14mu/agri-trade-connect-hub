@@ -20,6 +20,8 @@ import FarmerAuctions from "./pages/FarmerAuctions";
 import FarmerOrders from "./pages/FarmerOrders";
 import FarmerAppointments from "./pages/FarmerAppointments";
 import FarmerProfile from "./pages/FarmerProfile";
+import MyProducts from "./pages/farmer/MyProducts";
+import MarketProducts from "./pages/trader/MarketProducts";
 
 import TraderMarket from "./pages/TraderMarket";
 import TraderAuctions from "./pages/TraderAuctions";
@@ -34,6 +36,7 @@ import ProductForm from "./pages/ProductForm";
 import AuctionForm from "./pages/AuctionForm";
 import OrderDetail from "./pages/OrderDetail";
 import AppointmentForm from "./pages/AppointmentForm";
+import FarmerReports from './pages/farmer/FarmerReports';
 
 const queryClient = new QueryClient();
 
@@ -54,7 +57,7 @@ const App = () => (
             } />
             <Route path="/farmer-products" element={
               <ProtectedRoute requiredRole="farmer">
-                <FarmerProducts />
+                <MyProducts />
               </ProtectedRoute>
             } />
             <Route path="/farmer-products/add" element={
@@ -117,6 +120,7 @@ const App = () => (
                 <FarmerProfile />
               </ProtectedRoute>
             } />
+            <Route path="/farmer/reports" element={<FarmerReports />} />
             
             {/* Trader Routes */}
             <Route path="/trader-dashboard" element={
@@ -126,10 +130,10 @@ const App = () => (
             } />
             <Route path="/trader-market" element={
               <ProtectedRoute requiredRole="trader">
-                <TraderMarket />
+                <MarketProducts />
               </ProtectedRoute>
             } />
-            <Route path="/trader-products/:id" element={
+            <Route path="/trader-market/:id" element={
               <ProtectedRoute requiredRole="trader">
                 <ProductDetail />
               </ProtectedRoute>

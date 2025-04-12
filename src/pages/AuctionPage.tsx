@@ -19,6 +19,7 @@ import { Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { formatCurrency } from "../lib/utils";
 import BidHistory from "../components/BidHistory";
+import BidManagement from "../components/BidManagement";
 
 interface Profile {
   id: string;
@@ -75,10 +76,27 @@ interface DatabaseAuction {
   status: string;
   created_at: string;
   updated_at: string;
-  product: Product;
 }
 
-interface Auction extends DatabaseAuction {
+interface Auction {
+  id: string;
+  product_id: string;
+  farmer_id: string;
+  start_price: number;
+  current_price: number;
+  reserve_price: number | null;
+  min_increment: number;
+  quantity: number;
+  start_time: string;
+  end_time: string;
+  description: string | null;
+  auction_type: string;
+  allow_auto_bids: boolean;
+  visibility: string;
+  shipping_options: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
   farmer_profile: Profile;
   bids?: Bid[];
   product: Product;
@@ -358,71 +376,84 @@ const AuctionPage = () => {
   };
 
   const handleBidAction = async (bid: Bid, action: BidAction) => {
-    if (!auction || isProcessingBid) return;
-
+    setSelectedBid(bid);
     setIsProcessingBid(true);
+
     try {
-      // Update bid status
+      // Update the bid status
       const { error: bidError } = await supabase
         .from('bids')
-        .update({ status: action })
+        .update({
+          status: action === 'accept' ? 'accepted' : 'rejected',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', bid.id);
 
       if (bidError) throw bidError;
 
-      // If accepting the bid, update auction status and create order
       if (action === 'accept') {
-        // Update auction status
+        // Update all other bids to rejected
+        const { error: otherBidsError } = await supabase
+          .from('bids')
+          .update({
+            status: 'rejected',
+            updated_at: new Date().toISOString()
+          })
+          .eq('product_id', auction?.product_id)
+          .neq('id', bid.id);
+
+        if (otherBidsError) throw otherBidsError;
+
+        // Update auction status to 'ended'
         const { error: auctionError } = await supabase
           .from('auctions')
-          .update({ status: 'completed' })
-          .eq('id', auction.id);
+          .update({
+            status: 'ended',
+            current_price: bid.amount,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
 
         if (auctionError) throw auctionError;
 
-        // Create order
+        // Create an order for the accepted bid
         const { error: orderError } = await supabase
           .from('orders')
           .insert({
-            product_id: auction.product_id,
+            product_id: auction?.product_id,
+            farmer_id: auction?.farmer_id,
             trader_id: bid.bidder_id,
-            farmer_id: auction.farmer_id,
-            quantity: auction.quantity,
+            quantity: bid.quantity,
             price: bid.amount,
-            total_amount: bid.amount * auction.quantity,
             status: 'pending',
-            payment_status: 'pending'
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
 
         if (orderError) throw orderError;
-
-        // Update product status
-        const { error: productError } = await supabase
-          .from('products')
-          .update({ status: 'sold' })
-          .eq('id', auction.product_id);
-
-        if (productError) throw productError;
       }
+
+      // Refresh auction data
+      await fetchAuction();
 
       toast({
         title: action === 'accept' ? "Bid Accepted" : "Bid Rejected",
         description: action === 'accept' 
-          ? "The bid has been accepted and an order has been created." 
+          ? "The bid has been accepted and the auction has ended."
           : "The bid has been rejected.",
+        variant: "default"
       });
 
-      setSelectedBid(null);
-      fetchAuction();
-    } catch (error) {
-      console.error('Error processing bid:', error);
+    } catch (error: any) {
+      console.error(`Error ${action}ing bid:`, error);
       toast({
         title: "Error",
-        description: `Failed to ${action} bid. Please try again.`,
+        description: `Failed to ${action} bid: ${error.message}`,
         variant: "destructive"
       });
     } finally {
       setIsProcessingBid(false);
+      setSelectedBid(null);
     }
   };
 
@@ -470,142 +501,185 @@ const AuctionPage = () => {
           <p>Auction not found</p>
         </div>
       ) : (
-        <div className="grid gap-6">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle>{auction.product.name}</CardTitle>
-                  <CardDescription>
-                    Listed by {auction.farmer_profile.name}
-                  </CardDescription>
-                </div>
-                <Badge variant="secondary">
-                  {auction.product.category}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Quantity</Label>
-                    <p className="text-lg">{auction.quantity} {auction.product.unit}</p>
+        <div className="container mx-auto p-6">
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Left Column - Main Auction Details */}
+            <div className="space-y-6">
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <CardTitle className="text-2xl font-bold">{auction.product.name}</CardTitle>
+                      <CardDescription className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Listed by {auction.farmer_profile.name}
+                      </CardDescription>
+                    </div>
+                    <Badge variant="secondary" className="text-base px-4 py-1">
+                      {auction.product.category}
+                    </Badge>
                   </div>
-                  <div>
-                    <Label>Location</Label>
-                    <p className="text-lg">{auction.product.location}</p>
+                </CardHeader>
+                <CardContent className="space-y-8">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground">Quantity</Label>
+                      <p className="text-xl font-medium flex items-center gap-2">
+                        <Package className="h-5 w-5 text-muted-foreground" />
+                        {auction.quantity} {auction.product.unit}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground">Location</Label>
+                      <p className="text-xl font-medium flex items-center gap-2">
+                        <MapPin className="h-5 w-5 text-muted-foreground" />
+                        {auction.product.location}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                
-                <Separator />
-                
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span>Starting Price</span>
-                    <span>{formatCurrency(auction.start_price)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Current Price</span>
-                    <span className="text-xl font-bold">{formatCurrency(auction.current_price)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Minimum Increment</span>
-                    <span>{formatCurrency(auction.min_increment)}</span>
-                  </div>
-                </div>
-                
-                <Separator />
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span>Time Left</span>
-                    <span className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      {calculateTimeLeft(auction.end_time)}
-                    </span>
-                  </div>
-                  <Progress value={calculateProgress(auction.start_time, auction.end_time)} />
-                </div>
-                
-                {userRole === "trader" && (
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button className="w-full" disabled={isBidding}>
-                        {isBidding ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Placing Bid...
-                          </>
-                        ) : (
-                          <>
-                            <Gavel className="mr-2 h-4 w-4" />
-                            Place Bid
-                          </>
-                        )}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Place a Bid</DialogTitle>
-                        <DialogDescription>
-                          Enter your bid amount for {auction.product.name}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Current Price:</span>
-                            <span>{formatCurrency(auction.current_price)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Minimum Increment:</span>
-                            <span>{formatCurrency(auction.min_increment)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Minimum Bid:</span>
-                            <span>{formatCurrency(auction.current_price + auction.min_increment)}</span>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="bidAmount">Your Bid</Label>
-                          <Input
-                            id="bidAmount"
-                            type="number"
-                            step="0.01"
-                            value={bidAmount}
-                            onChange={(e) => setBidAmount(e.target.value)}
-                            placeholder="Enter bid amount"
-                          />
-                        </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-muted-foreground">Starting Price</Label>
+                        <p className="text-lg font-medium">{formatCurrency(auction.start_price)}</p>
                       </div>
-                      <DialogFooter>
-                        <Button onClick={handleBid} disabled={isBidding}>
+                      <div>
+                        <Label className="text-muted-foreground">Current Price</Label>
+                        <p className="text-2xl font-bold text-primary">{formatCurrency(auction.current_price)}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Minimum Increment</Label>
+                      <p className="text-lg font-medium">{formatCurrency(auction.min_increment)}</p>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-muted-foreground">Time Left</Label>
+                      <span className="flex items-center gap-2 text-lg font-medium">
+                        <Clock className="h-5 w-5 text-muted-foreground" />
+                        {calculateTimeLeft(auction.end_time)}
+                      </span>
+                    </div>
+                    <Progress value={calculateProgress(auction.start_time, auction.end_time)} className="h-2" />
+                  </div>
+                  
+                  {userRole === "trader" && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button className="w-full h-12 text-lg" disabled={isBidding}>
                           {isBidding ? (
                             <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                               Placing Bid...
                             </>
                           ) : (
-                            "Confirm Bid"
+                            <>
+                              <Gavel className="mr-2 h-5 w-5" />
+                              Place Bid
+                            </>
                           )}
                         </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Bid History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <BidHistory bids={auction.bids || []} />
-            </CardContent>
-          </Card>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Place a Bid</DialogTitle>
+                          <DialogDescription>
+                            Enter your bid amount for {auction.product.name}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-6 py-4">
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <Label>Current Price</Label>
+                                <p className="font-medium">{formatCurrency(auction.current_price)}</p>
+                              </div>
+                              <div>
+                                <Label>Minimum Increment</Label>
+                                <p className="font-medium">{formatCurrency(auction.min_increment)}</p>
+                              </div>
+                            </div>
+                            <div>
+                              <Label>Minimum Bid Required</Label>
+                              <p className="font-medium text-lg">{formatCurrency(auction.current_price + auction.min_increment)}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="bidAmount">Your Bid Amount</Label>
+                            <Input
+                              id="bidAmount"
+                              type="number"
+                              step="0.01"
+                              value={bidAmount}
+                              onChange={(e) => setBidAmount(e.target.value)}
+                              placeholder="Enter bid amount"
+                              className="text-lg"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button onClick={handleBid} disabled={isBidding} className="w-full">
+                            {isBidding ? (
+                              <>
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                Placing Bid...
+                              </>
+                            ) : (
+                              "Confirm Bid"
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Column - Bid History and Management */}
+            <div className="space-y-6">
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-xl">Bid History</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BidHistory bids={auction.bids || []} />
+                </CardContent>
+              </Card>
+              
+              {isFarmer && (
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-xl">Manage Bids</CardTitle>
+                    <CardDescription>
+                      Review and manage bids for this auction
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {auction.bids && auction.bids.length > 0 ? (
+                      <BidManagement
+                        bids={auction.bids}
+                        onAcceptBid={(bid) => handleBidAction(bid, 'accept')}
+                        onRejectBid={(bid) => handleBidAction(bid, 'reject')}
+                        disabled={!isFarmer || auction.status !== 'active'}
+                      />
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground">No bids have been placed yet</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </DashboardLayout>

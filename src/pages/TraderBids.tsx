@@ -208,7 +208,7 @@ const TraderBids = () => {
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        onClick={() => navigate(`/trader-auctions/view/${bid.product_id}`)}
+                        onClick={() => navigate(`/trader-auctions/${bid.product_id}`)}
                       >
                         View Auction
                       </Button>

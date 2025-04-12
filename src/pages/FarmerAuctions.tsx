@@ -179,7 +179,7 @@ const FarmerAuctions = () => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate(`/auctions/${row.original.id}`)}
+            onClick={() => navigate(`/farmer-auctions/${row.original.id}`)}
           >
             <Eye className="h-4 w-4" />
           </Button>
@@ -224,36 +224,36 @@ const FarmerAuctions = () => {
 
   return (
     <DashboardLayout userRole="farmer">
-      <DashboardHeader 
-        title="My Auctions"
-        userName={profile?.name || ""}
-        userRole="farmer"
-      />
-
-      <div className="p-4">
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <DashboardHeader title="My Auctions" userName={profile?.name || ""} userRole="farmer" />
+      
+      <div className="w-full p-6 space-y-6">
+        <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-200">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center space-y-4 sm:space-y-0">
               <div>
-                <CardTitle>Active Auctions</CardTitle>
-                <CardDescription>Browse and manage your active auctions</CardDescription>
+                <CardTitle className="text-2xl font-bold">Active Auctions</CardTitle>
+                <CardDescription className="text-base">Manage your ongoing and completed auctions</CardDescription>
               </div>
-              <Button onClick={() => navigate('/create-auction')}>
-                <Plus className="mr-2 h-4 w-4" /> Create Auction
+              <Button 
+                onClick={() => navigate("/farmer-auctions/create")}
+                size="lg"
+                className="bg-green-600 hover:bg-green-700 text-white shadow-sm"
+              >
+                <Plus className="mr-2 h-5 w-5" />
+                Create New Auction
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center p-4">
-                <Gavel className="h-8 w-8 animate-spin" />
-              </div>
-            ) : (
-              <DataTable
-                columns={columns}
-                data={auctions}
-              />
-            )}
+            <div className="rounded-lg border bg-white overflow-hidden">
+              {isLoading ? (
+                <div className="flex justify-center p-4">
+                  <Gavel className="h-8 w-8 animate-spin" />
+                </div>
+              ) : (
+                <DataTable columns={columns} data={auctions} />
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
 
 const COLORS = ['#2D6A4F', '#40916C', '#52B788', '#74C69D', '#95D5B2'];
 
@@ -282,103 +283,228 @@ const TraderDashboard = () => {
     <DashboardLayout userRole="trader">
       <DashboardHeader title="Trader Dashboard" userName={profile?.name || ""} userRole="trader" />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard 
-          title="Total Orders" 
-          value={dashboardData.totalOrders.toString()} 
-          icon={ShoppingCart}
-          change={dashboardData.changes.orders}
-        />
-        <StatCard 
-          title="Active Auctions" 
-          value={dashboardData.activeAuctions.length.toString()} 
-          icon={Gavel}
-          change={dashboardData.changes.auctions}
-        />
-        <StatCard 
-          title="Total Revenue" 
-          value={formatCurrency(dashboardData.totalRevenue)} 
-          icon={Wallet}
-          change={dashboardData.changes.revenue}
-        />
-        <StatCard 
-          title="Pending Orders" 
-          value={dashboardData.pendingOrders.toString()} 
-          icon={ShoppingBag}
-          change={dashboardData.changes.pendingOrders}
-        />
-      </div>
+      <div className="w-full p-6 space-y-6">
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard 
+            title="Total Orders" 
+            value={dashboardData.totalOrders.toString()} 
+            icon={ShoppingBag}
+            change={dashboardData.changes.orders}
+            className="bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg hover:shadow-xl transition-all duration-200"
+          />
+          <StatCard 
+            title="Active Auctions" 
+            value={dashboardData.activeAuctions.length.toString()} 
+            icon={Gavel}
+            change={dashboardData.changes.auctions}
+            className="bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg hover:shadow-xl transition-all duration-200"
+          />
+          <StatCard 
+            title="Total Spent" 
+            value={formatCurrency(dashboardData.totalRevenue)} 
+            icon={Wallet}
+            change={dashboardData.changes.revenue}
+            className="bg-gradient-to-br from-purple-50 to-pink-50 shadow-lg hover:shadow-xl transition-all duration-200"
+          />
+          <StatCard 
+            title="Pending Orders" 
+            value={dashboardData.pendingOrders.toString()} 
+            icon={ShoppingCart}
+            change={dashboardData.changes.pendingOrders}
+            className="bg-gradient-to-br from-orange-50 to-amber-50 shadow-lg hover:shadow-xl transition-all duration-200"
+          />
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Auctions</CardTitle>
-            <CardDescription>Current auctions you can participate in</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {dashboardData.activeAuctions.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">
-                  No active auctions
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Active Auctions */}
+          <Card className="lg:col-span-2 border-0 shadow-lg hover:shadow-xl transition-all duration-200">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl font-bold">Active Auctions</CardTitle>
+                  <CardDescription>Current ongoing auctions you can bid on</CardDescription>
                 </div>
-              ) : (
-                dashboardData.activeAuctions.map((auction) => (
-                  <div
-                    key={auction.id}
-                    className="flex items-center justify-between p-4 rounded-lg border bg-card"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-medium">{auction.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {auction.quantity} {auction.unit}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(auction.price)}</p>
-                        <p className="text-sm text-muted-foreground">{auction.location}</p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/trader-auctions/${auction.id}`)}
-                      >
-                        <ArrowUpRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                <Button variant="outline" size="sm" onClick={() => navigate('/trader/auctions')}>
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Current Price</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Ends In</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dashboardData.activeAuctions.slice(0, 5).map((auction) => (
+                      <TableRow key={auction.id}>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium">{auction.name}</div>
+                            <div className="text-sm text-muted-foreground">{auction.category}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatCurrency(auction.price)}</TableCell>
+                        <TableCell>{auction.quantity} {auction.unit}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {new Date(auction.end_time) > new Date() 
+                              ? formatDistanceToNow(new Date(auction.end_time), { addSuffix: true })
+                              : "Ended"
+                            }
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/trader/auctions/${auction.id}`)}
+                          >
+                            <ArrowUpRight className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {dashboardData.activeAuctions.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                          No active auctions at the moment
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Categories</CardTitle>
-            <CardDescription>Distribution of available products</CardDescription>
+          {/* Product Categories */}
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-200">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl font-bold">Product Categories</CardTitle>
+                  <CardDescription>Distribution of available products</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={dashboardData.productCategories}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      fill="#2D6A4F"
+                      label={({ name, value }) => `${name}: ${value}%`}
+                    >
+                      {dashboardData.productCategories.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom" height={36} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="mt-6 pt-6 border-t">
+                <h4 className="text-sm font-medium mb-4">Quick Actions</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => navigate('/trader/market')}
+                  >
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    Browse Market
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => navigate('/trader/auctions')}
+                  >
+                    <Gavel className="h-4 w-4 mr-2" />
+                    View Auctions
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Orders */}
+        <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-200">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-xl font-bold">Recent Orders</CardTitle>
+                <CardDescription>Your latest transactions</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/trader/orders')}>
+                View All Orders
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={dashboardData.productCategories}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label
-                  >
-                    {dashboardData.productCategories.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dashboardData.recentOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">#{order.id.slice(0, 8)}</TableCell>
+                      <TableCell>{order.products?.name || 'Unknown Product'}</TableCell>
+                      <TableCell>{formatCurrency(order.total_amount)}</TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          order.status === 'completed' ? 'default' :
+                          order.status === 'pending' ? 'secondary' : 'outline'
+                        }>
+                          {order.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate(`/trader/orders/${order.id}`)}
+                        >
+                          <ArrowUpRight className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {dashboardData.recentOrders.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                        No recent orders
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>

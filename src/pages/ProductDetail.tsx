@@ -22,12 +22,45 @@ import {
   Gavel,
   ShoppingCart,
   MessageCircle,
-  Loader2
+  Loader2,
+  Phone
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
+
+interface Profile {
+  id: string;
+  name: string;
+  role: string;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  description?: string | null;
+  category: string;
+  quantity: number;
+  unit: string;
+  price: number;
+  location: string;
+  status: string;
+  quality: string;
+  created_at: string;
+  updated_at: string;
+  farmer_id: string;
+  image_url?: string | null;
+  additional_images?: string[] | null;
+  auction_id?: string | null;
+  category_id?: string | null;
+  formattedPrice?: string;
+  farmer?: Profile;
+}
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -36,31 +69,24 @@ const ProductDetail = () => {
   const { profile } = useAuth();
   const [userRole, setUserRole] = useState<"farmer" | "trader">("farmer");
   const [loading, setLoading] = useState(true);
-  const [product, setProduct] = useState<any>(null);
-  const [priceHistory, setPriceHistory] = useState<any[]>([]);
+  const [product, setProduct] = useState<Product | null>(null);
   
   useEffect(() => {
     const fetchProduct = async () => {
       if (!id) return;
       
       try {
-        // First fetch the product details with farmer profile information
+        // First fetch the product details
         const { data: productData, error: productError } = await supabase
           .from('products')
-          .select(`
-            *,
-            profiles:farmer_id (
-              id,
-              name,
-              avatar_url,
-              email,
-              phone
-            )
-          `)
+          .select('*')
           .eq('id', id)
           .single();
           
-        if (productError) throw productError;
+        if (productError) {
+          console.error('Error fetching product:', productError);
+          throw productError;
+        }
         
         if (!productData) {
           toast({
@@ -72,19 +98,31 @@ const ProductDetail = () => {
           return;
         }
 
-        // Fetch price history if available
-        const { data: priceData, error: priceError } = await supabase
-          .from('product_price_history')
-          .select('*')
-          .eq('product_id', id)
-          .order('created_at', { ascending: false });
+        // Fetch farmer profile
+        const { data: farmerData, error: farmerError } = await supabase
+          .from('profiles')
+          .select('id, name, role, phone, address, city, state')
+          .eq('id', productData.farmer_id)
+          .single();
 
-        if (!priceError) {
-          setPriceHistory(priceData || []);
+        if (farmerError) {
+          console.error('Error fetching farmer:', farmerError);
         }
 
-        setProduct(productData);
-      } catch (error) {
+        const formattedProduct: Product = {
+          ...productData,
+          farmer: farmerData || {
+            id: productData.farmer_id,
+            name: 'Unknown Farmer',
+            role: 'farmer'
+          },
+          formattedPrice: productData.price && !isNaN(productData.price) 
+            ? formatCurrency(productData.price)
+            : 'Price not set'
+        };
+
+        setProduct(formattedProduct);
+      } catch (error: any) {
         console.error('Error fetching product:', error);
         toast({
           title: "Error",
@@ -110,7 +148,7 @@ const ProductDetail = () => {
   }, []);
 
   // Check if current user is the product owner
-  const isProductOwner = profile?.id === product?.profiles?.id;
+  const isProductOwner = profile?.id === product?.farmer_id;
 
   const handleDelete = async () => {
     if (!id || !profile?.id) return;
@@ -269,21 +307,20 @@ const ProductDetail = () => {
                   </div>
                   <div>
                     <div className="text-sm font-medium mb-1">Price Per {product.unit}</div>
-                    <div className="text-2xl font-bold">{formatCurrency(product.price)}</div>
+                    <div className="text-2xl font-bold">{product.formattedPrice}</div>
                   </div>
                 </div>
               </div>
               
-              <Tabs defaultValue="details" className="w-full">
-                <TabsList className="grid grid-cols-3 w-full">
+              <Tabs defaultValue="details">
+                <TabsList className="grid grid-cols-2 w-full">
                   <TabsTrigger value="details">Details</TabsTrigger>
                   <TabsTrigger value="specifications">Specifications</TabsTrigger>
-                  <TabsTrigger value="price-history">Price History</TabsTrigger>
                 </TabsList>
                 <TabsContent value="details" className="space-y-4 mt-4">
                   <div>
                     <h3 className="font-medium mb-2">Product Description</h3>
-                    <p className="text-sm text-muted-foreground">{product.description}</p>
+                    <p className="text-sm text-muted-foreground">{product.description || "No description available"}</p>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -291,8 +328,8 @@ const ProductDetail = () => {
                       <div className="flex items-center space-x-4">
                         <CalendarDays className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">Harvest Date</p>
-                          <p className="text-sm text-muted-foreground">{new Date(product.harvest_date).toLocaleDateString()}</p>
+                          <p className="text-sm font-medium">Listed Date</p>
+                          <p className="text-sm text-muted-foreground">{new Date(product.created_at).toLocaleDateString()}</p>
                         </div>
                       </div>
                     </div>
@@ -300,20 +337,20 @@ const ProductDetail = () => {
                       <div className="flex items-center space-x-4">
                         <ClipboardList className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">Shelf Life</p>
-                          <p className="text-sm text-muted-foreground">{product.shelf_life || "Not specified"}</p>
+                          <p className="text-sm font-medium">Last Updated</p>
+                          <p className="text-sm text-muted-foreground">{new Date(product.updated_at).toLocaleDateString()}</p>
                         </div>
                       </div>
                     </div>
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="specifications" className="space-y-4">
+                <TabsContent value="specifications" className="mt-4">
                   <div className="space-y-4">
                     <h3 className="font-medium">Product Specifications</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex justify-between border-b pb-2">
-                        <span className="text-sm text-muted-foreground">Type</span>
+                        <span className="text-sm text-muted-foreground">Quality</span>
                         <span className="text-sm font-medium">{product.quality}</span>
                       </div>
                       <div className="flex justify-between border-b pb-2">
@@ -331,25 +368,6 @@ const ProductDetail = () => {
                     </div>
                   </div>
                 </TabsContent>
-                
-                <TabsContent value="price-history" className="space-y-4">
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Price History</h3>
-                    <div className="h-64 w-full bg-muted/50 rounded-md flex items-center justify-center">
-                      {priceHistory.length > 0 ? (
-                        <BarChart3 className="h-12 w-12 text-muted-foreground" />
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No price history available</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">Current Price</span>
-                        <span className="text-sm font-medium">{formatCurrency(product.price)}/{product.unit}</span>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
               </Tabs>
             </CardContent>
             <CardFooter>
@@ -358,33 +376,80 @@ const ProductDetail = () => {
           </Card>
         </div>
         
-        <div className="space-y-6">
+        <div className="lg:col-span-1">
           <Card>
             <CardHeader>
-              <CardTitle>Product Information</CardTitle>
+              <CardTitle>Farmer Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <Package className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div className="flex items-center space-x-4">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${product.farmer?.name}`} />
+                  <AvatarFallback>{product.farmer?.name?.charAt(0)}</AvatarFallback>
+                </Avatar>
                 <div>
-                  <div className="text-sm font-medium">Quantity Available</div>
-                  <div className="text-sm text-muted-foreground">
-                    {product.quantity} {product.unit}
-                  </div>
+                  <p className="font-medium">{product.farmer?.name}</p>
+                  <p className="text-sm text-muted-foreground">Verified Farmer</p>
                 </div>
               </div>
               
-              <div className="flex items-start space-x-3">
-                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <div className="text-sm font-medium">Location</div>
-                  <div className="text-sm text-muted-foreground">
-                    {product.location}
+              {product.farmer?.phone && (
+                <div className="flex items-start space-x-3">
+                  <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div>
+                    <div className="text-sm font-medium">Phone</div>
+                    <div className="text-sm text-muted-foreground">{product.farmer.phone}</div>
                   </div>
                 </div>
-              </div>
+              )}
+              
+              {product.farmer?.address && (
+                <div className="flex items-start space-x-3">
+                  <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div>
+                    <div className="text-sm font-medium">Address</div>
+                    <div className="text-sm text-muted-foreground">
+                      {[
+                        product.farmer.address,
+                        product.farmer.city,
+                        product.farmer.state
+                      ].filter(Boolean).join(", ")}
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
+          
+          {product.image_url && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Product Images</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="aspect-square rounded-md overflow-hidden">
+                  <img 
+                    src={product.image_url} 
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                {product.additional_images && product.additional_images.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {product.additional_images.map((image, index) => (
+                      <div key={index} className="aspect-square rounded-md overflow-hidden">
+                        <img 
+                          src={image} 
+                          alt={`${product.name} ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </DashboardLayout>

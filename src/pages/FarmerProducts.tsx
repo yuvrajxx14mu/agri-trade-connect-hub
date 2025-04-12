@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Package, Plus, Search, Pencil, Trash, Gavel, Eye } from "lucide-react";
+import { Package, Plus, Search, Pencil, Trash, Gavel, Eye, Edit, Trash2, PackageX } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -42,12 +42,41 @@ const FarmerProducts = () => {
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('*')
-          .eq('farmer_id', profile.id);
+          .select(`
+            *,
+            profiles:farmer_id (
+              id,
+              name,
+              role
+            )
+          `)
+          .eq('farmer_id', profile.id)
+          .order('created_at', { ascending: false });
           
         if (error) throw error;
         
-        setProducts(data as Product[]);
+        console.log('Raw data from database:', data);
+        
+        // Transform the data to ensure price and quantity are numbers
+        const transformedData = (data || []).map(product => {
+          console.log('Raw product:', product);
+          console.log('Raw product price:', product.price, 'Type:', typeof product.price);
+          const price = typeof product.price === 'string' ? parseFloat(product.price) : Number(product.price) || 0;
+          const quantity = typeof product.quantity === 'string' ? parseFloat(product.quantity) : Number(product.quantity) || 0;
+          
+          console.log('Parsed price:', price, 'Type:', typeof price);
+          
+          const transformed = {
+            ...product,
+            price,
+            quantity
+          };
+          return transformed;
+        });
+        
+        console.log('Transformed data:', transformedData);
+        
+        setProducts(transformedData);
       } catch (error) {
         console.error('Error fetching products:', error);
         toast({
@@ -73,7 +102,8 @@ const FarmerProducts = () => {
       const { error } = await supabase
         .from('products')
         .delete()
-        .eq('id', productId);
+        .eq('id', productId)
+        .eq('farmer_id', profile?.id);
         
       if (error) throw error;
       
@@ -107,144 +137,139 @@ const FarmerProducts = () => {
   
   return (
     <DashboardLayout userRole="farmer">
-      <DashboardHeader 
-        title="My Products" 
-        userName={profile?.name || "User"} 
-        userRole="farmer"
-      />
-      
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row justify-between sm:items-center">
+      <div className="h-full p-8">
+        <div className="flex items-center justify-between space-y-2">
           <div>
-            <CardTitle>Product Inventory</CardTitle>
-            <CardDescription>Manage your agricultural products</CardDescription>
+            <h1 className="text-3xl font-bold tracking-tight">Product Inventory</h1>
+            <p className="text-muted-foreground">Manage your agricultural products</p>
           </div>
           <Button 
             onClick={() => navigate("/farmer-products/add")}
-            className="mt-4 sm:mt-0"
+            size="lg"
+            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-sm transition-all duration-200"
           >
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="mr-2 h-5 w-5" />
             Add New Product
           </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search products..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="flex-shrink-0 w-full md:w-40">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="auction">In Auction</SelectItem>
-                  <SelectItem value="sold">Sold</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        </div>
+
+        <div className="mt-8 flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search by name, category, or location..."
+              className="pl-9 h-12 text-base bg-white shadow-sm hover:shadow transition-all duration-200"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
+          <div className="flex-shrink-0 w-full md:w-48">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-12 text-base bg-white shadow-sm hover:shadow transition-all duration-200">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Products</SelectItem>
+                <SelectItem value="active">Active Listings</SelectItem>
+                <SelectItem value="auction">In Auction</SelectItem>
+                <SelectItem value="sold">Sold Products</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        <div className="mt-6 rounded-lg border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="font-semibold">Product Name</TableHead>
+                <TableHead className="font-semibold">Category</TableHead>
+                <TableHead className="font-semibold text-right">Quantity</TableHead>
+                <TableHead className="font-semibold">Location</TableHead>
+                <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="font-semibold text-right">Price</TableHead>
+                <TableHead className="font-semibold text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
                 <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    <div className="flex items-center justify-center space-x-2">
+                      <Package className="h-6 w-6 animate-pulse text-muted-foreground" />
+                      <span className="text-muted-foreground">Loading products...</span>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center h-24">
-                      <div className="flex flex-col items-center justify-center">
-                        <p>Loading products...</p>
-                      </div>
+              ) : filteredProducts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <PackageX className="h-8 w-8 text-muted-foreground" />
+                      <span className="text-muted-foreground font-medium">No products found</span>
+                      <Button
+                        variant="link"
+                        onClick={() => navigate("/farmer-products/add")}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        Add your first product
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredProducts.map((product) => (
+                  <TableRow 
+                    key={product.id} 
+                    className="hover:bg-gray-50/90 transition-all duration-200 group"
+                  >
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>{product.category}</TableCell>
+                    <TableCell className="text-right">{product.quantity} {product.unit}</TableCell>
+                    <TableCell>{product.location}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant={
+                          product.status === "active" ? "default" :
+                          product.status === "auction" ? "secondary" :
+                          "outline"
+                        }
+                        className="font-medium capitalize"
+                      >
+                        {product.status}
+                      </Badge>
                     </TableCell>
-                  </TableRow>
-                ) : filteredProducts.length > 0 ? (
-                  filteredProducts.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell>{product.category}</TableCell>
-                      <TableCell>{product.quantity} {product.unit}</TableCell>
-                      <TableCell>{product.location}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant="outline" 
-                          className={
-                            product.status === "sold" 
-                              ? "bg-green-50 text-green-700 border-green-200" 
-                              : product.status === "inactive" && product.auction_id
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : "bg-yellow-50 text-yellow-700 border-yellow-200"
-                          }
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(product.price || 0)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => navigate(`/farmer-products/${product.id}`)}
+                          className="h-8 w-8 text-slate-600 hover:text-slate-900"
                         >
-                          {product.status === "active" ? "Listed" : 
-                           product.status === "inactive" && product.auction_id ? "In Auction" : 
-                           product.status.charAt(0).toUpperCase() + product.status.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatCurrency(product.price)}/{product.unit}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => navigate(`/farmer-products/${product.id}`)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => navigate(`/farmer-products/${product.id}/edit`)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          {product.status === "active" && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => navigate(`/farmer-auctions/create?product=${product.id}`)}
-                              className="hover:bg-blue-50"
-                            >
-                              <Gavel className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-destructive hover:bg-red-50"
-                            onClick={() => handleDeleteProduct(product.id)}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center h-24">
-                      <div className="flex flex-col items-center justify-center">
-                        <Package className="h-8 w-8 text-muted-foreground mb-2" />
-                        <p className="text-muted-foreground">No products found matching your criteria</p>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="h-8 w-8 text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
     </DashboardLayout>
   );
 };

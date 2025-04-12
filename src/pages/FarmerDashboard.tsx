@@ -146,8 +146,9 @@ const FarmerDashboard = () => {
 
   // Helper function to calculate product progress
   const calculateProgress = (product) => {
+    if (!product?.quantity || !product?.available_quantity) return 0;
     const soldQuantity = product.quantity - product.available_quantity;
-    return Math.round((soldQuantity / product.quantity) * 100);
+    return Math.max(0, Math.min(100, Math.round((soldQuantity / product.quantity) * 100)));
   };
 
   // Calculate percentage changes (comparing with previous period)
@@ -160,7 +161,9 @@ const FarmerDashboard = () => {
     return (
       <DashboardLayout userRole="farmer">
         <DashboardHeader title="Farmer Dashboard" userName={profile?.name || ""} userRole="farmer" />
-        <div>Loading...</div>
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+        </div>
       </DashboardLayout>
     );
   }
@@ -169,57 +172,79 @@ const FarmerDashboard = () => {
     <DashboardLayout userRole="farmer">
       <DashboardHeader title="Farmer Dashboard" userName={profile?.name || ""} userRole="farmer" />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <StatCard 
           title="Total Products" 
           value={dashboardData.totalProducts.toString()} 
           icon={Sprout}
           change={productChange}
+          className="bg-gradient-to-br from-green-50 to-emerald-50 shadow hover:shadow-lg transition-all duration-200"
         />
         <StatCard 
           title="Active Auctions" 
           value={dashboardData.activeAuctions.toString()} 
           icon={Gavel}
           change={auctionChange}
+          className="bg-gradient-to-br from-blue-50 to-indigo-50 shadow hover:shadow-lg transition-all duration-200"
         />
         <StatCard 
           title="Total Revenue" 
           value={formatCurrency(dashboardData.totalRevenue)} 
           icon={IndianRupee}
           change={revenueChange}
+          className="bg-gradient-to-br from-purple-50 to-pink-50 shadow hover:shadow-lg transition-all duration-200"
         />
         <StatCard 
           title="Pending Orders" 
           value={dashboardData.pendingOrders.toString()} 
           icon={ShoppingCart}
           change={orderChange}
+          className="bg-gradient-to-br from-orange-50 to-amber-50 shadow hover:shadow-lg transition-all duration-200"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Revenue Overview</CardTitle>
-            <CardDescription>Track your monthly earnings and sales</CardDescription>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {/* Revenue Chart */}
+        <Card className="xl:col-span-2 shadow hover:shadow-lg transition-all duration-200">
+          <CardHeader className="space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="text-xl font-bold">Revenue Overview</CardTitle>
+                <CardDescription>Track your monthly earnings and sales</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => navigate('/farmer/reports')}>
+                View Reports
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
+            <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={dashboardData.monthlyRevenue}>
                   <defs>
                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2D6A4F" stopOpacity={0.8}/>
+                      <stop offset="5%" stopColor="#2D6A4F" stopOpacity={0.3}/>
                       <stop offset="95%" stopColor="#2D6A4F" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis dataKey="name" stroke="#888" />
+                  <YAxis stroke="#888" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      background: 'white', 
+                      border: 'none', 
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)' 
+                    }} 
+                  />
                   <Area 
                     type="monotone" 
                     dataKey="value" 
                     stroke="#2D6A4F" 
+                    strokeWidth={2}
                     fillOpacity={1} 
                     fill="url(#colorValue)" 
                   />
@@ -229,33 +254,89 @@ const FarmerDashboard = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Performance</CardTitle>
-            <CardDescription>How your products are doing</CardDescription>
+        {/* Product Performance */}
+        <Card className="shadow hover:shadow-lg transition-all duration-200">
+          <CardHeader className="space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="text-xl font-bold">Product Performance</CardTitle>
+                <CardDescription>How your products are doing</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/farmer/products')}>
+                <Package className="h-4 w-4 mr-1" />
+                View All
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
               {dashboardData.productPerformance.map((product, index) => (
-                <div key={index}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm font-medium">{product.name}</div>
-                    <div className="text-sm text-muted-foreground">{product.progress}%</div>
+                <div key={index} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium">{product.name}</div>
+                      <div className="text-xs text-muted-foreground">Sales Progress</div>
+                    </div>
+                    <Badge variant={product.progress >= 75 ? "default" : product.progress >= 50 ? "secondary" : "outline"}>
+                      {product.progress}%
+                    </Badge>
                   </div>
-                  <Progress value={product.progress} className="h-2 bg-primary/20" />
+                  <Progress 
+                    value={product.progress} 
+                    className={`h-2 ${
+                      product.progress >= 75 
+                        ? "bg-green-100 [&>div]:bg-green-600" 
+                        : product.progress >= 50 
+                        ? "bg-yellow-100 [&>div]:bg-yellow-600" 
+                        : ""
+                    }`}
+                  />
                 </div>
               ))}
-              <Button 
-                variant="outline" 
-                className="w-full mt-4"
-                onClick={() => navigate("/farmer-products")}
-              >
-                View All Products
-              </Button>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent Products */}
+      <Card className="mt-4 shadow hover:shadow-lg transition-all duration-200">
+        <CardHeader className="space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="text-xl font-bold">Recent Products</CardTitle>
+              <CardDescription>Your recently added products</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product Name</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dashboardData.recentProducts.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>{product.category}</TableCell>
+                    <TableCell>{formatCurrency(product.price)}</TableCell>
+                    <TableCell>
+                      <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
+                        {product.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </DashboardLayout>
   );
 };

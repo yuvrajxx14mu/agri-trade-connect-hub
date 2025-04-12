@@ -18,12 +18,12 @@ const DashboardLayout = ({ children, userRole }: DashboardLayoutProps) => {
 
   return (
     <SidebarProvider defaultOpen={!isMobile}>
-      <div className="flex h-screen bg-background overflow-hidden">
+      <div className="flex min-h-screen w-full bg-background">
         <div className={`fixed left-0 top-0 h-full z-40 transition-transform duration-300 ${isMobile && !sidebarOpen ? "-translate-x-full" : "translate-x-0"}`}>
           <DashboardSidebar userRole={userRole} />
         </div>
-        <div className={`flex-1 overflow-auto transition-all duration-300 ${isMobile ? "ml-0" : "ml-0 md:ml-64"}`}>
-          <main className="p-4 md:p-6 lg:p-8 w-full">
+        <div className={`flex-1 min-h-screen w-full ${isMobile ? "" : "pl-64"}`}>
+          <main className="h-full w-full p-4 md:p-6 overflow-y-auto">
             {children}
           </main>
         </div>

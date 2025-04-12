@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, Gavel, Clock, Calendar, Loader2 } from "lucide-react";
+import { Search, Filter, Gavel, Clock, Calendar, Loader2, Eye } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -336,111 +336,136 @@ const TraderAuctions = () => {
     <DashboardLayout userRole="trader">
       <DashboardHeader title="Auctions" userName={profile?.name || ""} userRole="trader" />
       
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col md:flex-row justify-between md:items-center">
-            <div>
-              <CardTitle>Active Auctions</CardTitle>
-              <CardDescription>Browse and bid on agricultural products</CardDescription>
+      <div className="w-full p-6 space-y-6">
+        <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-200">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center space-y-4 sm:space-y-0">
+              <div>
+                <CardTitle className="text-2xl font-bold">Active Auctions</CardTitle>
+                <CardDescription className="text-base">Browse and bid on agricultural products</CardDescription>
+              </div>
             </div>
-            <div className="flex gap-4 mt-4 md:mt-0">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search auctions..."
-                  className="pl-8"
+                  placeholder="Search by product name, category, or location..."
+                  className="pl-9 h-12 text-base bg-white"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={locationFilter} onValueChange={setLocationFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All Locations</SelectItem>
-                  {locations.map((location) => (
-                    <SelectItem key={location} value={location}>
-                      {location}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredAuctions.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredAuctions.map((auction) => (
-                <Card key={`${auction.id}-${auction.auction.id}`} className="flex flex-col">
-                  <CardContent className="flex-1">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Quantity:</span>
-                        <span>{auction.quantity} {auction.unit}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Starting Price:</span>
-                        <span>{formatCurrency(auction.price)}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Current Bid:</span>
-                        <span className="font-semibold text-lg">
-                          {formatCurrency(auction.auction.current_price)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Total Bids:</span>
-                        <span>{auction.auction.bid_count}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Time Left:</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {calculateTimeLeft(auction.auction.end_time)}
-                        </span>
-                      </div>
-                      <BidDialog
-                        auction={auction.auction}
-                        onBid={(amount) => placeBid(auction.auction.id, amount)}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                <Gavel className="h-8 w-8 text-muted-foreground" />
+              <div className="flex gap-4">
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-[180px] h-12 text-base bg-white">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Categories</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={locationFilter} onValueChange={setLocationFilter}>
+                  <SelectTrigger className="w-[180px] h-12 text-base bg-white">
+                    <SelectValue placeholder="Location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Locations</SelectItem>
+                    {locations.map((location) => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <h3 className="text-lg font-medium mb-2">No auctions found</h3>
-              <p className="text-muted-foreground mb-6">
-                Try adjusting your filters or search terms
-              </p>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            
+            <div className="rounded-lg border bg-white overflow-hidden">
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mb-4"></div>
+                  <p className="text-muted-foreground">Loading auctions...</p>
+                </div>
+              ) : filteredAuctions.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+                  {filteredAuctions.map((auction) => (
+                    <Card key={`${auction.id}-${auction.auction.id}`} className="flex flex-col border shadow-md hover:shadow-lg transition-all duration-200">
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-lg font-semibold">{auction.name}</CardTitle>
+                            <CardDescription className="text-sm">{auction.category}</CardDescription>
+                          </div>
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            {auction.location}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-2">
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Quantity</p>
+                              <p className="font-medium">{auction.quantity} {auction.unit}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground">Current Bid</p>
+                              <p className="font-semibold text-lg text-green-600">{formatCurrency(auction.auction.current_price)}</p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Total Bids</p>
+                              <p className="font-medium">{auction.auction.bid_count}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground">Time Left</p>
+                              <div className="flex items-center gap-1 font-medium">
+                                <Clock className="h-4 w-4 text-orange-500" />
+                                {calculateTimeLeft(auction.auction.end_time)}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 pt-4">
+                            <Button
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => navigate(`/trader-auctions/${auction.auction.id}`)}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
+                            </Button>
+                            <BidDialog
+                              auction={auction.auction}
+                              onBid={(amount) => placeBid(auction.auction.id, amount)}
+                            />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64">
+                  <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center mb-4">
+                    <Gavel className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-lg font-medium text-muted-foreground mb-2">No auctions found</p>
+                  <p className="text-sm text-muted-foreground">Try adjusting your search or filter criteria</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </DashboardLayout>
   );
 };

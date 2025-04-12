@@ -2,11 +2,11 @@
 ALTER TABLE public.products
 DROP CONSTRAINT IF EXISTS products_farmer_id_fkey;
 
--- Add the correct foreign key constraint to reference profiles table
+-- Add the correct foreign key constraint to reference auth.users table
 ALTER TABLE public.products
 ADD CONSTRAINT products_farmer_id_fkey
 FOREIGN KEY (farmer_id)
-REFERENCES public.profiles(id)
+REFERENCES auth.users(id)
 ON DELETE CASCADE;
 
 -- Update RLS policies

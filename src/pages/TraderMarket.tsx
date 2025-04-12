@@ -143,84 +143,89 @@ const TraderMarket = () => {
     <DashboardLayout userRole="trader">
       <DashboardHeader title="Market" userName={profile?.name || ""} userRole="trader" />
       
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col md:flex-row justify-between md:items-center">
-            <div>
-              <CardTitle>Agricultural Market</CardTitle>
-              <CardDescription>Browse and purchase agricultural products</CardDescription>
+      <div className="w-full p-6 space-y-6">
+        <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-200">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center space-y-4 sm:space-y-0">
+              <div>
+                <CardTitle className="text-2xl font-bold">Agricultural Market</CardTitle>
+                <CardDescription className="text-base">Browse and purchase agricultural products</CardDescription>
+              </div>
             </div>
-            <div className="flex gap-4 mt-4 md:mt-0">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search products..."
-                  className="pl-8"
+                  placeholder="Search by product name, category, or location..."
+                  className="pl-9 h-12 text-base bg-white"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={locationFilter} onValueChange={setLocationFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All Locations</SelectItem>
-                  {locations.map((location) => (
-                    <SelectItem key={location} value={location}>
-                      {location}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  id={product.id}
-                  name={product.name}
-                  category={product.category}
-                  quantity={`${product.quantity} ${product.unit}`}
-                  price={formatCurrency(product.price)}
-                  location={product.location}
-                  status="Listed"
-                  image={product.image_url || undefined}
-                  userRole="trader"
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                <Package className="h-8 w-8 text-muted-foreground" />
+              <div className="flex gap-4">
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-[180px] h-12 text-base bg-white">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Categories</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={locationFilter} onValueChange={setLocationFilter}>
+                  <SelectTrigger className="w-[180px] h-12 text-base bg-white">
+                    <SelectValue placeholder="Location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Locations</SelectItem>
+                    {locations.map((location) => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <h3 className="text-lg font-medium mb-2">No products found</h3>
-              <p className="text-muted-foreground mb-6">
-                Try adjusting your filters or search terms
-              </p>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            
+            <div className="rounded-lg border bg-white overflow-hidden">
+              {filteredProducts.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+                  {filteredProducts.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      id={product.id}
+                      name={product.name}
+                      category={product.category}
+                      quantity={`${product.quantity} ${product.unit}`}
+                      price={formatCurrency(product.price)}
+                      location={product.location}
+                      status="Listed"
+                      image={product.image_url || undefined}
+                      userRole="trader"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64">
+                  <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center mb-4">
+                    <Package className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-lg font-medium text-muted-foreground mb-2">No products found</p>
+                  <p className="text-sm text-muted-foreground">Try adjusting your search or filter criteria</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </DashboardLayout>
   );
 };
