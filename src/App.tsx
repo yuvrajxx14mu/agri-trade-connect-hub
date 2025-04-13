@@ -38,6 +38,16 @@ import OrderDetail from "./pages/OrderDetail";
 import AppointmentForm from "./pages/AppointmentForm";
 import FarmerReports from './pages/farmer/FarmerReports';
 
+// Static Pages
+import HowItWorks from "./pages/static/HowItWorks";
+import Pricing from "./pages/static/Pricing";
+import Blog from "./pages/static/Blog";
+import HelpCenter from "./pages/static/HelpCenter";
+import Contact from "./pages/static/Contact";
+import TermsOfService from "./pages/static/TermsOfService";
+import PrivacyPolicy from "./pages/static/PrivacyPolicy";
+import CookiePolicy from "./pages/static/CookiePolicy";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -48,6 +58,16 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            
+            {/* Static Pages */}
+            <Route path="/how-it-works" element={<HowItWorks />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/help" element={<HelpCenter />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/cookies" element={<CookiePolicy />} />
             
             {/* Farmer Routes */}
             <Route path="/farmer-dashboard" element={
