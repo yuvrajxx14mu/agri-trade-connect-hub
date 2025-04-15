@@ -1,26 +1,16 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { DatePicker } from "@/components/ui/date-picker";
-import { useToast } from "@/components/ui/use-toast";
-import { format } from "date-fns";
-import { CalendarClock, Loader2, MapPin } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-
-const timeSlots = [
-  "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
-  "12:00 PM", "12:30 PM", "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM",
-  "03:00 PM", "03:30 PM", "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM"
-];
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CalendarClock } from 'lucide-react';
+import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { appointmentService } from '@/services/appointmentService';
 
 const AppointmentForm = () => {
   const navigate = useNavigate();
@@ -28,33 +18,27 @@ const AppointmentForm = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [traders, setTraders] = useState([]);
+  const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [title, setTitle] = useState("");
-  const [traderId, setTraderId] = useState("");
-  const [date, setDate] = useState(null);
+  const [userId, setUserId] = useState("");
+  const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    const fetchTraders = async () => {
+    const fetchUsers = async () => {
       if (!profile?.id) return;
       
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, name')
-          .eq('role', 'trader');
-          
-        if (error) throw error;
-        
-        setTraders(data || []);
+        const users = await appointmentService.getUsersWithPreviousTransactions(profile.id, profile.role as 'farmer' | 'trader');
+        setUsers(users);
       } catch (error) {
-        console.error('Error fetching traders:', error);
+        console.error('Error fetching users:', error);
         toast({
           title: "Error",
-          description: "Failed to fetch traders. Please try again.",
+          description: "Failed to fetch users. Please try again.",
           variant: "destructive",
         });
       } finally {
@@ -62,75 +46,58 @@ const AppointmentForm = () => {
       }
     };
     
-    fetchTraders();
-  }, [profile?.id, toast]);
-  
-  const handleSubmit = async (e) => {
+    fetchUsers();
+  }, [profile?.id, profile?.role, toast]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!profile?.id || !traderId || !date || !time || !location || !title) {
+    if (!profile?.id || !userId || !date || !time || !title) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
+        title: "Missing Information",
+        description: "Please fill in all required fields",
+        variant: "destructive"
       });
       return;
     }
-    
+
     setSubmitting(true);
-    
     try {
       const appointmentData = {
-        farmer_id: profile.id,
-        trader_id: traderId,
-        title: title,
-        appointment_date: format(date, 'yyyy-MM-dd'),
+        title,
+        trader_id: profile.role === 'farmer' ? userId : profile.id,
+        farmer_id: profile.role === 'farmer' ? profile.id : userId,
+        appointment_date: date,
         appointment_time: time,
-        location: location,
-        status: "pending",
+        location: location || "Virtual Meeting",
+        status: "upcoming"
       };
-      
-      const { data: appointment, error } = await supabase
-        .from('appointments')
-        .insert(appointmentData)
-        .select()
-        .single();
-        
-      if (error) throw error;
-      
-      // Create notification for trader
-      await supabase.from('notifications').insert({
-        user_id: traderId,
-        title: "New Appointment Request",
-        message: `${profile.name} has requested an appointment on ${format(date, 'PPP')} at ${time}`,
-        type: "appointment"
-      });
+
+      await appointmentService.createAppointment(appointmentData);
       
       toast({
         title: "Success",
-        description: "Appointment request sent successfully!",
+        description: "Appointment scheduled successfully",
       });
       
-      navigate('/farmer-appointments');
-      
+      navigate('/appointments');
     } catch (error) {
       console.error('Error creating appointment:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create appointment. Please try again.",
-        variant: "destructive",
+        description: "Failed to schedule appointment. Please try again.",
+        variant: "destructive"
       });
     } finally {
       setSubmitting(false);
     }
   };
-  
+
   return (
-    <DashboardLayout userRole="farmer">
+    <DashboardLayout userRole={profile?.role || 'farmer'}>
       <DashboardHeader 
         title="Book Appointment" 
-        userName={profile?.name || "Farmer"} 
-        userRole="farmer"
+        userName={profile?.name || "User"} 
+        userRole={profile?.role || 'farmer'}
       />
       
       <Card>
@@ -140,7 +107,7 @@ const AppointmentForm = () => {
             Request an Appointment
           </CardTitle>
           <CardDescription>
-            Fill in the details to request an appointment with a trader
+            Fill in the details to request an appointment with a {profile?.role === 'farmer' ? 'trader' : 'farmer'}
           </CardDescription>
         </CardHeader>
         
@@ -159,23 +126,29 @@ const AppointmentForm = () => {
                 />
               </div>
               
-              {/* Trader Selection */}
+              {/* User Selection */}
               <div className="space-y-2">
-                <Label htmlFor="trader">Trader</Label>
+                <Label htmlFor="user">{profile?.role === 'farmer' ? 'Trader' : 'Farmer'}</Label>
                 <Select 
-                  value={traderId} 
-                  onValueChange={setTraderId}
+                  value={userId} 
+                  onValueChange={setUserId}
                   disabled={loading}
                 >
-                  <SelectTrigger id="trader">
-                    <SelectValue placeholder="Select a trader" />
+                  <SelectTrigger id="user">
+                    <SelectValue placeholder={`Select a ${profile?.role === 'farmer' ? 'trader' : 'farmer'}`} />
                   </SelectTrigger>
                   <SelectContent>
-                    {traders.map((trader) => (
-                      <SelectItem key={trader.id} value={trader.id}>
-                        {trader.name}
+                    {users.length === 0 ? (
+                      <SelectItem value="" disabled>
+                        No {profile?.role === 'farmer' ? 'traders' : 'farmers'} found with previous transactions
                       </SelectItem>
-                    ))}
+                    ) : (
+                      users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -184,87 +157,58 @@ const AppointmentForm = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Date */}
               <div className="space-y-2">
-                <Label>Date</Label>
-                <DatePicker
-                  date={date}
-                  setDate={setDate}
-                  disabled={(date) => date < new Date()}
+                <Label htmlFor="date">Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                  min={new Date().toISOString().split('T')[0]}
                 />
               </div>
               
               {/* Time */}
               <div className="space-y-2">
                 <Label htmlFor="time">Time</Label>
-                <Select 
-                  value={time} 
-                  onValueChange={setTime}
-                >
-                  <SelectTrigger id="time">
-                    <SelectValue placeholder="Select time slot" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <ScrollArea className="h-60">
-                      {timeSlots.map(time => (
-                        <SelectItem key={time} value={time}>
-                          {time}
-                        </SelectItem>
-                      ))}
-                    </ScrollArea>
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="time"
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  required
+                />
               </div>
             </div>
             
             {/* Location */}
             <div className="space-y-2">
-              <Label htmlFor="location" className="flex items-center gap-1">
-                <MapPin className="h-4 w-4" />
-                Location
-              </Label>
+              <Label htmlFor="location">Location (Optional)</Label>
               <Input
                 id="location"
-                placeholder="e.g., Trader's Office, Virtual Meeting"
+                placeholder="e.g., Virtual Meeting or Physical Address"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                required
               />
             </div>
             
             {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
-              <Textarea
+              <Input
                 id="notes"
-                placeholder="Add any additional details about the appointment"
+                placeholder="Any additional information"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                rows={4}
               />
             </div>
+            
+            <div className="flex justify-end">
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Scheduling..." : "Schedule Appointment"}
+              </Button>
+            </div>
           </CardContent>
-          
-          <CardFooter className="flex justify-between">
-            <Button 
-              type="button"
-              variant="outline"
-              onClick={() => navigate('/farmer-appointments')}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit"
-              disabled={submitting || !traderId || !date || !time || !location || !title}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                'Request Appointment'
-              )}
-            </Button>
-          </CardFooter>
         </form>
       </Card>
     </DashboardLayout>

@@ -274,7 +274,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     return <AuthProviderContent navigate={navigate}>{children}</AuthProviderContent>;
   } catch (error) {
     console.warn("Router not available, navigation will be logged but not performed");
-    const fallbackNavigate = (path: string) => console.log(`Navigation intended to: ${path}`);
+    const fallbackNavigate = (path: string) => {
+      // Fallback navigation logic if needed
+    };
     return <AuthProviderContent navigate={fallbackNavigate}>{children}</AuthProviderContent>;
   }
 };

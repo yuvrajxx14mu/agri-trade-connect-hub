@@ -1,11 +1,30 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Appointment, CreateAppointmentDto, UpdateAppointmentDto } from '../types/appointment';
 
+interface UserWithProfile {
+  id: string;
+  name: string;
+}
+
+interface TransactionUser {
+  trader_id?: string;
+  farmer_id?: string;
+  bidder_id?: string;
+  profiles: {
+    id: string;
+    name: string;
+  };
+}
+
 export const appointmentService = {
   async createAppointment(appointment: CreateAppointmentDto): Promise<Appointment> {
     const { data, error } = await supabase
       .from('appointments')
-      .insert([appointment])
+      .insert({
+        ...appointment,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
       .select()
       .single();
 
@@ -90,5 +109,58 @@ export const appointmentService = {
 
     if (error) throw error;
     return data;
+  },
+
+  async getUsersWithPreviousTransactions(userId: string, userRole: 'farmer' | 'trader'): Promise<UserWithProfile[]> {
+    try {
+      // Get users from orders
+      const { data: orderUsers, error: orderError } = await supabase
+        .from('orders')
+        .select(`${userRole === 'farmer' ? 'trader_id' : 'farmer_id'}, profiles!${userRole === 'farmer' ? 'trader_id' : 'farmer_id'}(id, name)`)
+        .eq(`${userRole === 'farmer' ? 'farmer_id' : 'trader_id'}`, userId);
+
+      if (orderError) throw orderError;
+
+      // Get users from bids
+      const { data: bidUsers, error: bidError } = await supabase
+        .from('bids')
+        .select(`${userRole === 'farmer' ? 'bidder_id' : 'farmer_id'}, profiles!${userRole === 'farmer' ? 'bidder_id' : 'farmer_id'}(id, name)`)
+        .eq(`${userRole === 'farmer' ? 'farmer_id' : 'bidder_id'}`, userId);
+
+      if (bidError) throw bidError;
+
+      // Get users from auctions
+      const { data: auctionUsers, error: auctionError } = await supabase
+        .from('auctions')
+        .select(`${userRole === 'farmer' ? 'trader_id' : 'farmer_id'}, profiles!${userRole === 'farmer' ? 'trader_id' : 'farmer_id'}(id, name)`)
+        .eq(`${userRole === 'farmer' ? 'farmer_id' : 'trader_id'}`, userId);
+
+      if (auctionError) throw auctionError;
+
+      // Combine and deduplicate users
+      const allUsers = [
+        ...(orderUsers || []),
+        ...(bidUsers || []),
+        ...(auctionUsers || [])
+      ] as unknown as TransactionUser[];
+
+      // Create a map to deduplicate users by ID
+      const userMap = new Map<string, UserWithProfile>();
+      allUsers.forEach(user => {
+        const userId = user[userRole === 'farmer' ? 'trader_id' : 'farmer_id'];
+        const profile = user.profiles;
+        if (userId && profile) {
+          userMap.set(userId, {
+            id: userId,
+            name: profile.name
+          });
+        }
+      });
+
+      return Array.from(userMap.values());
+    } catch (error) {
+      console.error('Error fetching users with previous transactions:', error);
+      throw error;
+    }
   }
 }; 

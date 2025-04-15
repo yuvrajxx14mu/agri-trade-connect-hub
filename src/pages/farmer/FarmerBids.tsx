@@ -22,6 +22,7 @@ interface Bid {
   expires_at: string;
   auction_end_time: string;
   created_at: string;
+  updated_at: string;
   message?: string;
   product: {
     name: string;
@@ -59,8 +60,21 @@ export const FarmerBids = () => {
       const { data, error } = await supabase
         .from('bids')
         .select(`
-          *,
-          product:products(
+          id,
+          product_id,
+          bidder_id,
+          bidder_name,
+          amount,
+          quantity,
+          status,
+          is_highest_bid,
+          previous_bid_amount,
+          expires_at,
+          auction_end_time,
+          created_at,
+          updated_at,
+          message,
+          product:products (
             name,
             image_url,
             farmer_id
@@ -100,6 +114,16 @@ export const FarmerBids = () => {
       const bid = bids.find(b => b.id === bidId);
       if (!bid) throw new Error('Bid not found');
 
+      // Get the auction details to get the quantity
+      const { data: auctionData, error: auctionError } = await supabase
+        .from('auctions')
+        .select('quantity')
+        .eq('product_id', bid.product_id)
+        .single();
+
+      if (auctionError) throw auctionError;
+      if (!auctionData) throw new Error('Auction not found');
+
       // Update all other bids for this product to rejected
       await supabase
         .from('bids')
@@ -110,6 +134,16 @@ export const FarmerBids = () => {
         .eq('product_id', bid.product_id)
         .neq('id', bidId);
 
+      // Get trader's shipping address from their profile
+      const { data: traderProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('address')
+        .eq('id', bid.bidder_id)
+        .single();
+
+      if (profileError) throw profileError;
+      if (!traderProfile?.address) throw new Error('Trader shipping address not found');
+
       // Create an order from the accepted bid
       const { error: orderError } = await supabase
         .from('orders')
@@ -117,11 +151,12 @@ export const FarmerBids = () => {
           product_id: bid.product_id,
           trader_id: bid.bidder_id,
           farmer_id: user?.id,
-          quantity: bid.quantity,
+          quantity: auctionData.quantity,
           price: bid.amount,
-          total_amount: bid.amount * bid.quantity,
+          total_amount: bid.amount * auctionData.quantity,
           status: 'pending',
-          payment_status: 'pending'
+          payment_status: 'pending',
+          shipping_address: traderProfile.address
         }]);
 
       if (orderError) throw orderError;
@@ -135,12 +170,12 @@ export const FarmerBids = () => {
       if (productError) throw productError;
 
       // Update auction status
-      const { error: auctionError } = await supabase
+      const { error: auctionUpdateError } = await supabase
         .from('auctions')
         .update({ status: 'completed' })
         .eq('product_id', bid.product_id);
 
-      if (auctionError) throw auctionError;
+      if (auctionUpdateError) throw auctionUpdateError;
 
       // Create notification for the trader
       const { error: notificationError } = await supabase

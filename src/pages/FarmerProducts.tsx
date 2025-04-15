@@ -55,16 +55,9 @@ const FarmerProducts = () => {
           
         if (error) throw error;
         
-        console.log('Raw data from database:', data);
-        
-        // Transform the data to ensure price and quantity are numbers
         const transformedData = (data || []).map(product => {
-          console.log('Raw product:', product);
-          console.log('Raw product price:', product.price, 'Type:', typeof product.price);
           const price = typeof product.price === 'string' ? parseFloat(product.price) : Number(product.price) || 0;
           const quantity = typeof product.quantity === 'string' ? parseFloat(product.quantity) : Number(product.quantity) || 0;
-          
-          console.log('Parsed price:', price, 'Type:', typeof price);
           
           const transformed = {
             ...product,
@@ -73,8 +66,6 @@ const FarmerProducts = () => {
           };
           return transformed;
         });
-        
-        console.log('Transformed data:', transformedData);
         
         setProducts(transformedData);
       } catch (error) {

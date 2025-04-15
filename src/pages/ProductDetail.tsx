@@ -232,7 +232,7 @@ const ProductDetail = () => {
   const renderTraderActions = () => (
     <div className="flex flex-col sm:flex-row gap-3">
       {product.status === "active" ? (
-        <Button className="bg-agri-trader" onClick={handleOrderCreate}>
+        <Button variant="purchase" onClick={handleOrderCreate}>
           <ShoppingCart className="mr-2 h-4 w-4" />
           Purchase Now
         </Button>

@@ -174,7 +174,7 @@ const TraderAppointments = () => {
           appointment_date: formattedDate,
           appointment_time: selectedTime,
           location: meetingLocation || "Virtual Meeting",
-          status: "pending"
+          status: "upcoming"
         })
         .select();
       
@@ -235,14 +235,12 @@ const TraderAppointments = () => {
   
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "pending":
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
-      case "confirmed":
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Confirmed</Badge>;
+      case "upcoming":
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Upcoming</Badge>;
+      case "completed":
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Completed</Badge>;
       case "cancelled":
         return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Cancelled</Badge>;
-      case "completed":
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Completed</Badge>;
       default:
         return <Badge variant="outline">Unknown</Badge>;
     }
@@ -437,7 +435,7 @@ const TraderAppointments = () => {
                               </div>
                             </div>
                             
-                            {appointment.status === "pending" && (
+                            {appointment.status === "upcoming" && (
                               <div className="flex justify-end gap-2 mt-4">
                                 <Button 
                                   variant="outline" 
@@ -449,10 +447,10 @@ const TraderAppointments = () => {
                                 </Button>
                                 <Button 
                                   size="sm"
-                                  onClick={() => updateAppointmentStatus(appointment.id, "confirmed")}
+                                  onClick={() => updateAppointmentStatus(appointment.id, "completed")}
                                 >
                                   <Check className="mr-1 h-4 w-4" />
-                                  Confirm
+                                  Complete
                                 </Button>
                               </div>
                             )}

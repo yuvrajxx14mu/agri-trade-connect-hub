@@ -13,10 +13,12 @@ export interface Appointment {
 
 export interface CreateAppointmentDto {
   trader_id: string;
+  farmer_id: string;
   title: string;
   appointment_date: string;
   appointment_time: string;
   location: string;
+  status: string;
 }
 
 export interface UpdateAppointmentDto {

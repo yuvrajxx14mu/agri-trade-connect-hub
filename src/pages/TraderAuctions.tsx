@@ -38,39 +38,47 @@ interface DatabaseAuction {
     location: string;
     image_url: string | null;
     farmer_id: string;
-  } | null;
+  };
   profiles: {
     id: string;
     name: string;
     role: string;
-  } | null;
+  };
   bids: Array<{
     id: string;
     amount: number;
     bidder_id: string;
     created_at: string;
-  }> | null;
+  }>;
 }
 
 interface AuctionProduct {
   id: string;
   name: string;
   category: string;
+  description: string;
   quantity: number;
   unit: string;
-  price: number;
   location: string;
-  farmer_id: string;
-  farmer_name: string;
-  created_at: string;
-  image_url?: string;
+  image_url: string | null;
+  farmer: {
+    id?: string;
+    name: string;
+    role?: string;
+  };
   auction: {
     id: string;
+    start_price: number;
     current_price: number;
     min_increment: number;
     end_time: string;
     status: string;
-    bid_count: number;
+    bids: Array<{
+      id: string;
+      amount: number;
+      bidder_id: string;
+      created_at: string;
+    }>;
   };
 }
 
@@ -92,6 +100,8 @@ const TraderAuctions = () => {
 
   const fetchAuctions = async () => {
     try {
+      setIsLoading(true);
+      
       const { data: auctionsData, error: auctionsError } = await supabase
         .from('auctions')
         .select(`
@@ -105,7 +115,7 @@ const TraderAuctions = () => {
           end_time,
           status,
           created_at,
-          products:product_id (
+          products!product_id(
             id,
             name,
             category,
@@ -117,7 +127,7 @@ const TraderAuctions = () => {
             image_url,
             farmer_id
           ),
-          bids (
+          bids(
             id,
             amount,
             bidder_id,
@@ -127,64 +137,101 @@ const TraderAuctions = () => {
         .eq('status', 'active')
         .order('end_time', { ascending: true });
 
-      if (auctionsError) throw auctionsError;
+      if (auctionsError) {
+        toast({
+          title: "Error",
+          description: "Unable to load auctions. Please try again later.",
+          variant: "destructive"
+        });
+        return;
+      }
 
-      // Get farmer profiles in a separate query
-      const farmerIds = [...new Set(auctionsData?.map(a => a.farmer_id) || [])];
+      if (!auctionsData || !Array.isArray(auctionsData)) {
+        setAuctions([]);
+        setCategories([]);
+        setLocations([]);
+        return;
+      }
+
+      // Fetch farmer profiles separately
+      const farmerIds = [...new Set(auctionsData.map(auction => auction.farmer_id))];
       const { data: farmerProfiles, error: farmerError } = await supabase
         .from('profiles')
         .select('id, name, role')
         .in('id', farmerIds);
 
-      if (farmerError) throw farmerError;
+      if (farmerError) {
+        toast({
+          title: "Warning",
+          description: "Some farmer information may be unavailable.",
+          variant: "default"
+        });
+      }
 
       // Create a map of farmer profiles
-      const farmerMap = Object.fromEntries(
-        (farmerProfiles || []).map(p => [p.id, p])
-      );
+      const farmerProfilesMap = (farmerProfiles || []).reduce((acc, profile) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {});
 
-      // Transform the data to match AuctionProduct interface
-      const transformedAuctions = (auctionsData as unknown as DatabaseAuction[])?.map(auction => ({
-        id: auction.product_id || '',
-        name: auction.products?.name || 'Unknown Product',
-        category: auction.products?.category || 'Uncategorized',
-        quantity: auction.quantity,
-        unit: auction.products?.unit || '',
-        price: auction.current_price,
-        location: auction.products?.location || '',
-        farmer_id: auction.farmer_id,
-        farmer_name: farmerMap[auction.farmer_id]?.name || 'Unknown Farmer',
-        created_at: auction.created_at,
-        image_url: auction.products?.image_url,
-        auction: {
-          id: auction.id,
-          current_price: auction.current_price,
-          min_increment: auction.min_increment,
-          end_time: auction.end_time,
-          status: auction.status,
-          bid_count: auction.bids?.length || 0
-        }
-      })) || [];
+      // Transform the data to include product and farmer information
+      const transformedAuctions: AuctionProduct[] = auctionsData
+        .filter(auction => {
+          if (!auction.products) {
+            console.warn('Missing product data for auction:', auction.id);
+            return false;
+          }
+          return true;
+        })
+        .map(auction => {
+          const product = auction.products as NonNullable<DatabaseAuction['products']>;
+          const farmerProfile = farmerProfilesMap[auction.farmer_id] || {
+            id: auction.farmer_id,
+            name: 'Unknown Farmer',
+            role: 'farmer'
+          };
+          
+          return {
+            id: product.id,
+            name: product.name,
+            category: product.category,
+            description: product.description || '',
+            quantity: auction.quantity,
+            unit: product.unit,
+            location: product.location,
+            image_url: product.image_url,
+            farmer: {
+              id: farmerProfile.id,
+              name: farmerProfile.name,
+              role: farmerProfile.role
+            },
+            auction: {
+              id: auction.id,
+              start_price: auction.start_price,
+              current_price: auction.current_price,
+              min_increment: auction.min_increment,
+              end_time: auction.end_time,
+              status: auction.status,
+              bids: Array.isArray(auction.bids) ? auction.bids : []
+            }
+          };
+        });
 
-      // Get unique categories and locations
-      const uniqueCategories = [...new Set(transformedAuctions
-        .map(a => a.category)
-        .filter(category => category && category.trim() !== ''))];
-      const uniqueLocations = [...new Set(transformedAuctions
-        .map(a => a.location)
-        .filter(location => location && location.trim() !== ''))];
-
+      // Extract unique categories and locations for filters
+      const uniqueCategories = [...new Set(transformedAuctions.map(a => a.category))].filter(Boolean);
+      const uniqueLocations = [...new Set(transformedAuctions.map(a => a.location))].filter(Boolean);
+      
+      setAuctions(transformedAuctions);
       setCategories(uniqueCategories);
       setLocations(uniqueLocations);
-      setAuctions(transformedAuctions);
-      setIsLoading(false);
     } catch (error) {
-      console.error('Error fetching auctions:', error);
+      console.error('Error in fetchAuctions:', error);
       toast({
         title: "Error",
-        description: "Failed to load auctions. Please try again.",
+        description: "Unable to load auctions. Please try again later.",
         variant: "destructive"
       });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -223,7 +270,7 @@ const TraderAuctions = () => {
       auction.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       auction.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       auction.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      auction.farmer_name.toLowerCase().includes(searchTerm.toLowerCase());
+      auction.farmer.name.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesCategory = categoryFilter === "All" || auction.category === categoryFilter;
     const matchesLocation = locationFilter === "All" || auction.location === locationFilter;
@@ -254,35 +301,31 @@ const TraderAuctions = () => {
   };
 
   const placeBid = async (auctionId: string, amount: number) => {
-    if (!profile) return;
+    if (!profile) {
+      toast({
+        title: "Error",
+        description: "Please log in to place a bid.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
       const auction = auctions.find(a => a.auction.id === auctionId);
       if (!auction) {
-        console.error('Auction not found:', auctionId);
         toast({
           title: "Error",
-          description: "Auction not found. Please try again.",
+          description: "Auction not found. Please refresh the page and try again.",
           variant: "destructive"
         });
         return;
       }
 
-      // Log UUIDs for debugging
-      console.log('Profile ID:', profile.id);
-      console.log('Auction ID:', auction.auction.id);
-      console.log('Product ID:', auction.id);
-
       // Ensure all UUIDs are correctly set
       if (!profile.id || !auction.auction.id || !auction.id) {
-        console.error('Missing UUIDs for placing bid:', {
-          profileId: profile.id,
-          auctionId: auction.auction.id,
-          productId: auction.id
-        });
         toast({
           title: "Error",
-          description: "Missing required information. Please try again.",
+          description: "Unable to place bid. Please try again later.",
           variant: "destructive"
         });
         return;
@@ -300,7 +343,6 @@ const TraderAuctions = () => {
         });
 
       if (bidError) {
-        console.error('Error placing bid:', bidError);
         throw bidError;
       }
 
@@ -311,7 +353,6 @@ const TraderAuctions = () => {
         .eq('id', auction.auction.id);
 
       if (updateError) {
-        console.error('Error updating auction price:', updateError);
         throw updateError;
       }
 
@@ -326,7 +367,7 @@ const TraderAuctions = () => {
       console.error('Error in placeBid:', error);
       toast({
         title: "Error",
-        description: "Failed to place bid. Please try again.",
+        description: "Unable to place bid. Please try again later.",
         variant: "destructive"
       });
     }
@@ -424,7 +465,7 @@ const TraderAuctions = () => {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <p className="text-sm text-muted-foreground">Total Bids</p>
-                              <p className="font-medium">{auction.auction.bid_count}</p>
+                              <p className="font-medium">{auction.auction.bids.length}</p>
                             </div>
                             <div>
                               <p className="text-sm text-muted-foreground">Time Left</p>

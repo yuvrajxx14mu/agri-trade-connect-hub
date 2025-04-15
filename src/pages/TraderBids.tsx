@@ -122,11 +122,8 @@ const TraderBids = () => {
   };
 
   const filteredBids = bids.filter(bid => {
-    console.log('Filtering bid:', bid);
-    // Default to true if no search term
     const matchesSearch = !searchTerm || 
       (bid.products?.name && bid.products.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    // Default to true if filter is 'all'
     const matchesStatus = filterStatus === 'all' || bid.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
