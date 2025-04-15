@@ -149,16 +149,6 @@ const OrderDetail = () => {
         variant: "default"
       });
       
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: userRole === 'farmer' ? order.trader_id : order.farmer_id,
-          title: "Order Status Updated",
-          message: `Order #${id.slice(0, 8)} status has been updated to ${newStatus}`,
-          type: "order_update",
-          read: false
-        });
-        
     } catch (error) {
       console.error('Error updating order status:', error);
       toast({
@@ -195,16 +185,6 @@ const OrderDetail = () => {
         variant: "default"
       });
       
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: order.farmer_id,
-          title: "Payment Status Updated",
-          message: `Payment for Order #${id.slice(0, 8)} has been updated to ${newStatus}`,
-          type: "payment_update",
-          read: false
-        });
-        
     } catch (error) {
       console.error('Error updating payment status:', error);
       toast({
@@ -219,26 +199,61 @@ const OrderDetail = () => {
     if (!id || !profile?.id) return;
     
     try {
-      const { data: orderData, error } = await supabase
+      // First get the order details
+      const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .select(`
-          *,
-          products:product_id(name, description),
-          profiles:farmer_id(name),
-          trader:trader_id(name)
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
-      if (error) throw error;
+      if (orderError) {
+        throw new Error('Failed to fetch order data: ' + orderError.message);
+      }
+
+      if (!orderData) {
+        throw new Error('Order not found');
+      }
+
+      // Get product details
+      const { data: productData, error: productError } = await supabase
+        .from('products')
+        .select('name, description, unit')
+        .eq('id', orderData.product_id)
+        .single();
+
+      if (productError || !productData) {
+        throw new Error('Failed to fetch product details');
+      }
+
+      // Get farmer details
+      const { data: farmerData, error: farmerError } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', orderData.farmer_id)
+        .single();
+
+      if (farmerError || !farmerData) {
+        throw new Error('Failed to fetch farmer details');
+      }
+
+      // Get trader details
+      const { data: traderData, error: traderError } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', orderData.trader_id)
+        .single();
+
+      if (traderError || !traderData) {
+        throw new Error('Failed to fetch trader details');
+      }
 
       const invoiceData = {
         orderId: orderData.id,
         date: format(new Date(orderData.created_at), 'dd/MM/yyyy'),
-        farmerName: orderData.profiles.name,
-        traderName: orderData.trader.name,
+        farmerName: farmerData.name as string,
+        traderName: traderData.name as string,
         items: [{
-          name: orderData.products.name,
+          name: productData.name as string,
           quantity: orderData.quantity,
           price: orderData.price,
           total: orderData.total_amount
@@ -246,12 +261,18 @@ const OrderDetail = () => {
         total: orderData.total_amount
       };
 
-      downloadInvoice(invoiceData, `invoice-${orderData.id}.pdf`);
-    } catch (error) {
+      await downloadInvoice(invoiceData, `invoice-${orderData.id}.pdf`);
+      
+      toast({
+        title: "Success",
+        description: "Invoice downloaded successfully",
+        variant: "default"
+      });
+    } catch (error: any) {
       console.error('Error generating invoice:', error);
       toast({
         title: "Error",
-        description: "Failed to generate invoice",
+        description: error.message || "Failed to generate invoice",
         variant: "destructive"
       });
     }

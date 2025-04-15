@@ -227,7 +227,6 @@ const FarmerOrders = () => {
                     key={order.id}
                     {...formatOrderData(order)}
                     onClick={() => navigate(`/farmer-orders/${order.id}`)}
-                    onGenerateInvoice={() => handleGenerateInvoice(order.id)}
                   />
                 ))}
               </div>
