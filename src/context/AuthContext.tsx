@@ -211,10 +211,8 @@ const AuthProviderContent = ({
   const signOut = async () => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
       
-      // Clear all auth state
+      // First, clear the local state
       setSession(null);
       setUser(null);
       setProfile(null);
@@ -222,9 +220,22 @@ const AuthProviderContent = ({
       // Clear any cached data in localStorage
       localStorage.clear();
       
+      // Then attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut({
+        scope: 'global'
+      });
+      
+      if (error) {
+        console.error('Logout error:', error);
+        // Even if there's an error, we'll still redirect to clear the UI state
+      }
+      
       // Force a full page reload to clear all state
       window.location.href = '/auth';
     } catch (error) {
+      console.error('Logout error:', error);
+      // Even if there's an error, we'll still redirect to clear the UI state
+      window.location.href = '/auth';
     } finally {
       setLoading(false);
     }

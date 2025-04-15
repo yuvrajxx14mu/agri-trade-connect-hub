@@ -127,7 +127,7 @@ const TraderDashboard = () => {
       const { data: currentOrders, error: ordersError } = await supabase
         .from('orders')
         .select('*, products (*)')
-        .eq('farmer_id', profile.id)
+        .eq('trader_id', profile.id)
         .gte('created_at', currentPeriodStart.toISOString())
         .lte('created_at', now.toISOString());
 
@@ -145,7 +145,7 @@ const TraderDashboard = () => {
       const { data: previousOrders } = await supabase
         .from('orders')
         .select('*, products (*)')
-        .eq('farmer_id', profile.id)
+        .eq('trader_id', profile.id)
         .gte('created_at', previousPeriodStart.toISOString())
         .lt('created_at', currentPeriodStart.toISOString());
 
@@ -419,29 +419,6 @@ const TraderDashboard = () => {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-
-              {/* Quick Actions */}
-              <div className="mt-6 pt-6 border-t">
-                <h4 className="text-sm font-medium mb-4">Quick Actions</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={() => navigate('/trader/market')}
-                  >
-                    <ShoppingBag className="h-4 w-4 mr-2" />
-                    Browse Market
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={() => navigate('/trader/auctions')}
-                  >
-                    <Gavel className="h-4 w-4 mr-2" />
-                    View Auctions
-                  </Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </div>
@@ -454,9 +431,6 @@ const TraderDashboard = () => {
                 <CardTitle className="text-xl font-bold">Recent Orders</CardTitle>
                 <CardDescription>Your latest transactions</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/trader/orders')}>
-                View All Orders
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -468,7 +442,6 @@ const TraderDashboard = () => {
                     <TableHead>Product</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -485,20 +458,11 @@ const TraderDashboard = () => {
                           {order.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/trader/orders/${order.id}`)}
-                        >
-                          <ArrowUpRight className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   ))}
                   {dashboardData.recentOrders.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                      <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
                         No recent orders
                       </TableCell>
                     </TableRow>

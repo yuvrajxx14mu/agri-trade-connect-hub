@@ -12,6 +12,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     storageKey: 'agritrade-auth-token',
     persistSession: true,
-    detectSessionInUrl: false
+    detectSessionInUrl: false,
+    autoRefreshToken: true,
+    storage: window.localStorage,
+    flowType: 'pkce'
   }
 });
