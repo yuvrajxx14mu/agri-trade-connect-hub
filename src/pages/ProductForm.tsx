@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Upload, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +22,8 @@ interface FormData {
   price: string;
   location: string;
   quality: string;
+  image_url: string;
+  additional_images: string[];
 }
 
 const ProductForm = () => {
@@ -32,6 +34,9 @@ const ProductForm = () => {
   const isEditMode = !!id;
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
   
   const [formData, setFormData] = useState<FormData>({
     name: "",
@@ -41,7 +46,9 @@ const ProductForm = () => {
     unit: "Quintals",
     price: "",
     location: "",
-    quality: "Standard"
+    quality: "Standard",
+    image_url: "",
+    additional_images: []
   });
   
   useEffect(() => {
@@ -73,7 +80,9 @@ const ProductForm = () => {
           unit: data.unit,
           price: data.price.toString(),
           location: data.location,
-          quality: data.quality
+          quality: data.quality,
+          image_url: data.image_url,
+          additional_images: data.additional_images || []
         });
         
       } catch (error) {
@@ -127,7 +136,9 @@ const ProductForm = () => {
         quality: formData.quality,
         status: "active",
         farmer_id: profile.id,
-        farmer_name: profile.name
+        farmer_name: profile.name,
+        image_url: formData.image_url,
+        additional_images: formData.additional_images
       };
       
       if (isEditMode) {
@@ -178,6 +189,89 @@ const ProductForm = () => {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+  
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+    
+    try {
+      setUploadingImage(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile?.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+      
+      setFormData(prev => ({
+        ...prev,
+        image_url: data.publicUrl
+      }));
+      
+      toast({
+        title: "Success",
+        description: "Image uploaded successfully."
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload image.",
+        variant: "destructive"
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setSelectedImage(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    handleImageUpload(file);
+  };
+
+  const handleCameraCapture = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.play();
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      video.onloadedmetadata = () => {
+        const context = canvas.getContext('2d');
+        context?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
+            setSelectedImage(file);
+            setPreviewUrl(URL.createObjectURL(file));
+            handleImageUpload(file);
+          }
+          stream.getTracks().forEach(track => track.stop());
+        }, 'image/jpeg');
+      };
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      toast({
+        title: "Error",
+        description: "Could not access camera. Please check permissions.",
+        variant: "destructive"
+      });
     }
   };
   
@@ -346,6 +440,53 @@ const ProductForm = () => {
                     <SelectItem value="Economy">Economy</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <Label>Product Image *</Label>
+              <div className="flex flex-col gap-4">
+                <div className="flex gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById('image-upload')?.click()}
+                    disabled={uploadingImage}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Choose from Device
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCameraCapture}
+                    disabled={uploadingImage}
+                  >
+                    <Camera className="mr-2 h-4 w-4" />
+                    Take Photo
+                  </Button>
+                </div>
+                <input
+                  id="image-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+                {(previewUrl || formData.image_url) && (
+                  <div className="relative w-64 h-64 rounded-md overflow-hidden border">
+                    <img
+                      src={previewUrl || formData.image_url}
+                      alt="Product preview"
+                      className="w-full h-full object-cover"
+                    />
+                    {uploadingImage && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-white" />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
