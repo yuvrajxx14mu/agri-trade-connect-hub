@@ -193,51 +193,92 @@ const ProductForm = () => {
   };
   
   const handleImageUpload = async (file: File) => {
-    if (!file) return;
+    if (!file || !profile?.id) {
+      toast({
+        title: "Error",
+        description: "Please select a file and make sure you're logged in",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       setUploadingImage(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${profile?.id}/${Date.now()}.${fileExt}`;
       
-      const { error: uploadError } = await supabase.storage
+      // Check file size (limit to 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error('File size too large. Please upload an image smaller than 5MB.');
+      }
+
+      // Create file path - simplified to avoid path issues
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${Date.now()}.${fileExt}`;
+      
+      // Upload file
+      const { data, error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
       
-      if (uploadError) throw uploadError;
-      
-      const { data } = supabase.storage
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new Error(uploadError.message);
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
         .from('product-images')
         .getPublicUrl(fileName);
-      
+
+      // Update form data with new image URL
       setFormData(prev => ({
         ...prev,
-        image_url: data.publicUrl
+        image_url: publicUrl
       }));
       
       toast({
         title: "Success",
-        description: "Image uploaded successfully."
+        description: "Image uploaded successfully"
       });
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Error uploading image:', error);
       toast({
         title: "Error",
-        description: "Failed to upload image.",
+        description: error.message || "Failed to upload image. Please try again.",
         variant: "destructive"
       });
+      // Clear preview if upload failed
+      setPreviewUrl("");
+      setSelectedImage(null);
     } finally {
       setUploadingImage(false);
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Error",
+        description: "Please select an image file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Create preview URL
+    const preview = URL.createObjectURL(file);
+    setPreviewUrl(preview);
     setSelectedImage(file);
-    setPreviewUrl(URL.createObjectURL(file));
-    handleImageUpload(file);
+
+    // Upload the image
+    await handleImageUpload(file);
   };
 
   const handleCameraCapture = async () => {
